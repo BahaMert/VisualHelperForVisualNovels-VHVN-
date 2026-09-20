@@ -143,6 +143,7 @@ public sealed class StructuredViewReader {
     DateTime nextRead, lastValid;
     string lastSession; long lastSequence;
     public bool OwnsNarration { get { return policy.OwnsNarration; } }
+    public bool HasLiveState { get { return current!=null; } }
     public StructuredViewReader(string path,Log logger) { file=path; log=logger; }
     public ViewDecision Poll(bool focused, DateTime processStartUtc, DateTime now) {
         if(now>=nextRead) {

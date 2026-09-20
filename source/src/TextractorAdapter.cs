@@ -23,20 +23,28 @@ public sealed class TextractorAdapter : IGameAdapter {
     FataLineParser parser;
     DateTime launched, lastOutput;
     bool attached, stopping, ready;
+    BridgeConnectionStatus bridgeStatus;
+    public bool BridgeOnly { get; private set; }
     public int GamePid { get; private set; }
     public event Action<Dialogue> DialogueReceived;
     public event Action<string> Status;
     public TextractorAdapter(string projectRoot, GameProfile p, Log logger) { root=projectRoot; profile=p; log=logger; }
     public void Start() {
-        if (Process.GetProcessesByName("TextractorCLI").Length>0 || Process.GetProcessesByName("Textractor").Length>0)
-            throw new InvalidOperationException("Close the capture experiment and Textractor before starting this helper.");
         var games=Process.GetProcessesByName(profile.processName);
         if (games.Length!=1) throw new InvalidOperationException("Open one copy of Fata Morgana first, then press Connect.");
         game=games[0]; GamePid=game.Id;
         var module=game.MainModule;
-        string hash;
-        using (var sha=SHA256.Create()) using(var f=File.OpenRead(module.FileName)) hash=BitConverter.ToString(sha.ComputeHash(f)).Replace("-","");
-        if (!String.Equals(hash,profile.exeSha256,StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("This game build differs from the tested build. Update its adapter profile before attaching.");
+        var compatibility=GameCompatibility.Inspect(module.FileName,profile);
+        string hash=compatibility.Hash;
+        BridgeOnly=!compatibility.VerifiedFallback;
+        if(BridgeOnly) {
+            bridgeStatus=new BridgeConnectionStatus(DateTime.UtcNow);
+            log.Write("compatibility-mode",new {gamePid=GamePid,build=hash,fallbackEnabled=false});
+            Notify("Connecting to game text in compatibility mode...");
+            return;
+        }
+        if (Process.GetProcessesByName("TextractorCLI").Length>0 || Process.GetProcessesByName("Textractor").Length>0)
+            throw new InvalidOperationException("Close the capture experiment and Textractor before starting this helper.");
         parser=new FataLineParser(profile,GamePid,(ulong)module.BaseAddress.ToInt64());
         var path=Path.Combine(root,profile.cliRelativePath.Replace('/',Path.DirectorySeparatorChar));
         child=new Process();
@@ -51,10 +59,15 @@ public sealed class TextractorAdapter : IGameAdapter {
         Notify("Preparing capture...");
     }
     void Notify(string value) { log.Write("status",value); if(Status!=null) Status(value); }
+    public void ObserveBridge(bool live,DateTime now) {
+        if(!BridgeOnly || bridgeStatus==null) return;
+        string message=bridgeStatus.Update(live,now); if(message!=null) Notify(message);
+    }
     void Command(string text) { var bytes=Encoding.Unicode.GetBytes(text+"\n"); child.StandardInput.BaseStream.Write(bytes,0,bytes.Length); child.StandardInput.BaseStream.Flush(); }
     public void Poll() {
-        if(stopping || child==null) return;
+        if(stopping || game==null) return;
         if(game.HasExited) throw new InvalidOperationException("The game has closed. Close the helper or reopen the game and Connect.");
+        if(BridgeOnly || child==null) return;
         if(child.HasExited) throw new InvalidOperationException("Capture stopped unexpectedly. Close this helper, restart the game, and retry.");
         string line;
         // Stock CLI emits the initial clipboard before attachment. Discard startup output entirely;

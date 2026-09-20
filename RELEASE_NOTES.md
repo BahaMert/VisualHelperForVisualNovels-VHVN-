@@ -1,13 +1,14 @@
-Download **VHVN-Setup.exe** below. Close the game and VHVN, run the installer, then open VHVN from your desktop or Start menu. No uninstall or manual folder cleanup is needed for a recognized older helper.
+Download **VHVN-Setup.exe** below. Close VHVN and the game, run the installer, then open VHVN. No uninstall or manual folder cleanup is needed for recognized older helper installations.
 
-Fixed in 0.2.2:
+New in 0.2.3:
 
-- **Repeat reads the dialogue.** Hovering a speaker name, menu item, or backlog entry no longer replaces the passage remembered by Repeat. Names remain hover-only.
-- **Keys work normally outside the game.** Repeat and toggle act only when the game is focused; switching to email, chat, or another app passes those keys through normally.
-- **Accessible upgrades for earlier installations.** Setup recognizes previous helper bridges, including supported development versions without a portable ownership record, and offers a spoken, keyboard-accessible Replace helper / Cancel prompt. The old extension is backed up and saves/settings are kept. No manual deletion is needed.
+- **Modified English Steam executables are no longer blocked just because their hash changed.** Setup checks for a 32-bit Windows executable and the expected English game archives.
+- Compatible modified builds use the structured game-text bridge. VHVN reports Connected after receiving live bridge data and explains when game text is not responding.
+- The version-specific fallback capture is used only for the verified reference executable. It is never attached to an unverified modified build.
+- Owned game integration can still be removed if the game executable is subsequently changed to an unsupported engine.
 
-Unrelated or unrecognized modified game extensions remain protected. Upgrade confirmation applies only to the exact file reviewed; changing it before installation requires a new confirmation.
+Also includes the 0.2.2 fixes: Repeat remembers dialogue rather than hovered names, shortcut keys work normally outside the focused game, and recognized legacy helper installations can be replaced through a spoken confirmation with backups.
 
-Requires Windows 10/11 x64, installed Windows speech voices, and the verified English Steam build of The House in Fata Morgana. This remains a preview; wider gameplay and assistive-tool testing continue. The EXE is currently unsigned.
+Compatibility mode is not a guarantee for every patch or engine replacement. Tested locally with synthetic executable/header changes; the friend's actual modified game still needs a live trial. Windows 10/11 x64 and installed Windows speech voices are required. The EXE is currently unsigned.
 
 Players: choose **VHVN-Setup.exe**, not the Source code ZIPs. SHA256SUMS.txt contains the installer checksum.

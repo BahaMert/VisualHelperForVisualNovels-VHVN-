@@ -15,12 +15,12 @@ Voice, speed, volume and optional shortcuts are in the helper. Type a shortcut, 
 
 Close the helper and run a new installer to update. If game setup detects a recognized earlier helper, choose Replace helper or Cancel in the spoken confirmation. The old extension is backed up; no manual file deletion is required. Close the game/helper and use Windows Installed apps / Apps & features to uninstall VHVN. Saves, settings and backups stay in place. Game integration is removed only after ownership/hash checks succeed.
 
-Requires Windows 10/11 x64, installed Windows speech voices and the supported English Steam game build. Other builds/languages are not yet verified. First-time setup may need permission to write in the game folder. The reader runs normally.
+Requires Windows 10/11 x64, installed Windows speech voices and the English Steam game. Modified 32-bit executables may use compatibility mode when the expected English game data is present. Actual compatibility is confirmed by receiving live game text; patches that change the engine or scripts may need further support. First-time setup may need permission to write in the game folder. The reader runs normally.
 
 Settings, local logs and backups: %APPDATA%\VisualNovelHelper
 Logs can include story spoilers. Speech uses installed Windows voices; no cloud speech service is used. This preview still needs wider player/Magnifier/screen-reader testing.
 
 Downloads: https://github.com/BahaMert/VisualHelperForVisualNovels-VHVN-/releases
 
-Tested game executable SHA256:
+Reference executable SHA256 for verified fallback capture (not required for compatibility mode):
 8AE01E946B52ECDC38D02B3F394B70793C7A4628D7A46D204030311B9B447A93

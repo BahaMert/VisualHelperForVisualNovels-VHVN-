@@ -54,11 +54,10 @@ public static class PortableSelfTests {
             Check(!PortableSetup.NeedsSetup(root,data),"legacy migration adopts portable ownership and data path");
             Check(Directory.GetFiles(Path.Combine(data,"backups"),"AfterInit2.tjs",SearchOption.AllDirectories).Any(f=>PortableSetup.Hash(f)==legacy),"previous legacy bridge backed up exactly");
             PortableSetup.Install(root,game,data,saves,true);
-            File.AppendAllText(Path.Combine(game,"fata.exe"),"unknown build");
-            Refuses(()=>PortableSetup.Install(root,game,data,saves,false),"unsupported executable refused");
+            CompatibilityTests.Run(root,game,data,saves);
             var paths=PortableSetup.LibraryPaths("\"path\" \"D:\\\\SteamLibrary\"\n\"1\" \"E:\\\\Games\"\n\"2\" \"100\"").ToArray();
             Check(paths.Length==2 && paths[0]==@"D:\SteamLibrary" && paths[1]==@"E:\Games","Steam modern/legacy libraries");
-            File.WriteAllText(Path.Combine(workspace,"result.txt"),"PASS: first-run detection; fresh install; confirmed update/removal; cancellation leaves existing files untouched; legacy migration without manifest; exact approval hash and backups; unrelated/modified extension and unsupported build rejection; Steam library parsing.");
+            File.WriteAllText(Path.Combine(workspace,"result.txt"),"PASS: first-run detection; confirmed update/cancellation; legacy migration and backups; unrelated extensions protected; modified EXE/header accepted in bridge-only mode; invalid architecture/missing English data refused; Steam library parsing.");
             return 0;
         } catch(Exception ex) { File.WriteAllText(Path.Combine(workspace,"result.txt"),ex.ToString()); return 1; }
     }

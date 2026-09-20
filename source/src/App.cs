@@ -172,6 +172,7 @@ public sealed class HelperWindow : Form {
             if(adapter!=null) {
                 if(viewReader!=null) {
                     var decision=viewReader.Poll(focused,gameStartUtc,DateTime.UtcNow);
+                    adapter.ObserveBridge(viewReader.HasLiveState,DateTime.UtcNow);
                     if(decision.Stop) narrator.Stop();
                     if(decision.Text!=null) {
                         narrator.Receive(new Dialogue { Text=decision.Text, Source="engine-visible-state", RememberForRepeat=decision.IsDialogue });

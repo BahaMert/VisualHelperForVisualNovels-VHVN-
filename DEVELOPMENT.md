@@ -1,4 +1,11 @@
 # Development handoff
+## Latest changes — 0.2.3
+
+Exact executable SHA256 is no longer an installation gate. GameCompatibility.Inspect accepts the reference exe as verified (existing fallback unchanged), or an x86 PE32 executable beside data.xp3/data_en.xp3 with expected XP3 headers as a bridge-only candidate. This is a heuristic, not proof of patch compatibility. The gate checks PE structure/machine/flags with bounded reads; no file-size match or archive hash pinning. Modified executables never start Textractor or use its fixed offsets. TextractorAdapter.BridgeOnly returns before CLI creation, polls game lifetime, and receives fresh validated bridge status from StructuredViewReader.HasLiveState. Connected is announced only after live transport; a 15-second missing-text status can recover when data later arrives. Stale/corrupt/old-process files cannot validate the connection. No game script/bridge changes were needed. Logs record the actual executable hash and fallbackEnabled=false for diagnostics.
+
+CompatibilityTests changes only copied executables (overlay append, large-address-aware header flag, architecture corruption) and creates invented archive-header fixtures. Modified files are never executed by tests. Confirms relaxed install/removal, fallback classification, missing/invalid archives and wrong architecture rejection, and removal of owned integration after unsupported engine change. Self-tests cover delayed/missing/recovered bridge status and transport freshness. Friend's actual patch remains untested; request patch identity/logs if the live bridge does not respond. Never claim that any modified build is guaranteed to work.
+
+Use version0.2.3 for the next release. This section supersedes older exact-fingerprint support claims below; exact hashes still protect extension ownership and approval, independently of executable compatibility.
 ## Latest changes — 0.2.2
 
 - Dialogue now carries RememberForRepeat; only actual fallback dialogue or a semantic passage updates the repeat buffer. Structured hover, menus and backlog speech are transient. ViewDecision.IsDialogue marks passage speech; a new connection clears stale dialogue. Regression covers names/menus between passages, mute and repeat.

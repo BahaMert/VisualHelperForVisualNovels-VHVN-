@@ -108,11 +108,11 @@ public static class ViewSelfTests {
         using(var log=new Log(Path.Combine(root,"tests","view-reader-test.jsonl"))) {
             var reader=new StructuredViewReader(path,log);
             reader.Poll(true,now.AddSeconds(1),now.AddSeconds(1));
-            Check(!reader.OwnsNarration,"previous-process file rejected");
+            Check(!reader.OwnsNarration && !reader.HasLiveState,"previous-process file cannot validate bridge compatibility");
             reader.Poll(true,now.AddSeconds(-1),now.AddSeconds(1.1));
-            Check(reader.OwnsNarration,"fresh current-process file accepted");
+            Check(reader.OwnsNarration && reader.HasLiveState,"fresh current-process file accepted");
             reader.Poll(true,now.AddSeconds(-1),now.AddSeconds(5));
-            Check(!reader.OwnsNarration,"dead bridge expires");
+            Check(!reader.OwnsNarration && !reader.HasLiveState,"dead bridge expires");
         }
     }
 }

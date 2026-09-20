@@ -8,15 +8,15 @@ A Windows read-aloud helper for **The House in Fata Morgana**, designed to make 
 
 Click to advance dialogue as usual. The helper speaks the current passage and lets you hear supported choices, menu controls, and backlog entries by hovering over them. It does not choose answers, advance the story, or save/load for you.
 
-**Status: v0.2.2 preview.** Currently supports one verified English Steam build of the game. Other games, languages, and executable versions are not supported yet. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
+**Status: v0.2.3 preview.** Designed for the English Steam game. Modified 32-bit executables can use compatibility mode when the expected English game data is present. Other games, languages, and replacement engines are not generally supported. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
 
 ## Requirements
 
 - Windows 10 or 11, 64-bit.
-- Your own installed English Steam copy of *The House in Fata Morgana* matching the supported build.
+- Your own installed English Steam copy of *The House in Fata Morgana*.
 - Windows .NET Framework 4.x and an installed Windows speech voice.
 
-Setup checks the game executable before installing. The helper is not tied to a particular username, drive letter, Steam library, or folder on the developer's PC.
+Setup checks the executable format and English game data. A changed executable hash alone no longer blocks installation. The helper is not tied to a particular username, drive letter, Steam library, or folder on the developer's PC.
 
 ## Download and install
 
@@ -79,7 +79,8 @@ When setup finds a recognized earlier VHVN integration, including supported earl
 ## Troubleshooting and limits
 
 - **Game not detected:** use Browse to select the folder containing `fata.exe`.
-- **Unsupported game version:** this profile checks the exact executable hash. Other builds and languages need verification and an appropriate adapter/profile.
+- **Modified executable:** VHVN automatically uses compatibility mode with a supported 32-bit executable and the expected `data.xp3` and `data_en.xp3` archives. In this mode it waits for live structured text from the game; fixed-address fallback capture stays disabled.
+- **Game text is not responding:** restart the game after setup. If the message persists, the modification may change the engine or scripts in a way that needs adapter work. Share the patch/tool name and relevant helper logs; do not undo a working compatibility patch just to satisfy a hash check.
 - **Helper does not connect:** close other Textractor/capture sessions and old helper instances, restart the game, then reopen the helper under your normal Windows account.
 - **An update seems inactive:** restart the game; the bridge loads at game startup.
 - **No audio:** check the selected Windows voice, volume, and speech setting, then focus the game.
@@ -126,7 +127,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-Releas
 This rebuilds the reader and outputs `artifacts\VHVN-Setup.exe` plus `SHA256SUMS.txt`. No scripts are needed by the player.
 
 For a release, update `VERSION.txt`, `source/src/AssemblyInfo.cs`, and the release notes, build/test the reader, and commit the updated `bin/VisualNovelHelper.exe` with its source. Pushing the version change to `main` runs the release workflow. It packages that tested binary using a checksum-pinned installer compiler and publishes the installer and checksum in GitHub Releases. An existing version is never overwritten. The workflow can also be started manually.
-Supported game executable SHA-256:
+Reference executable SHA-256 (enables the previously verified fallback capture; other compatible executables use the structured bridge only):
 
 ```text
 8AE01E946B52ECDC38D02B3F394B70793C7A4628D7A46D204030311B9B447A93

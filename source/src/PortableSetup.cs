@@ -55,11 +55,10 @@ public static class PortableSetup {
         using(var sha=SHA256.Create()) using(var stream=File.OpenRead(path)) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","");
     }
     static bool Same(string a,string b) { return String.Equals(Path.GetFullPath(a),Path.GetFullPath(b),StringComparison.OrdinalIgnoreCase); }
-    public static void Validate(string root,string game) {
+    public static void Validate(string root,string game,bool checkCompatibility=true) {
         var profile=Json.Deserialize<GameProfile>(File.ReadAllText(Path.Combine(root,"profiles","fata.json")));
         var exe=Path.Combine(game,"fata.exe");
-        if(!File.Exists(exe)) throw new InvalidOperationException("Choose the game folder containing fata.exe.");
-        if(!String.Equals(Hash(exe),profile.exeSha256,StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("This game version has not been tested. This package supports the English Steam build listed in START HERE.txt.");
+        if(checkCompatibility) GameCompatibility.Inspect(exe,profile);
         foreach(var process in Process.GetProcessesByName("fata")) using(process) {
             string path; try { path=process.MainModule.FileName; } catch { throw new InvalidOperationException("Close Fata Morgana before setup."); }
             if(Same(path,exe)) throw new InvalidOperationException("Close Fata Morgana before installing or removing its helper.");
@@ -109,7 +108,7 @@ public static class PortableSetup {
     }
     public static string Install(string root,string game,string data,string saves,bool remove,string approvedExistingHash=null) {
         game=Path.GetFullPath(game); data=Path.GetFullPath(data);
-        Validate(root,game);
+        Validate(root,game,!remove);
         string target=Path.Combine(game,"AfterInit2.tjs"), record=Path.Combine(game,RecordName);
         InstallRecord old=null;
         if(File.Exists(target)) old=remove?Owned(target,record):Recognized(root,target,record);
@@ -198,7 +197,7 @@ public static class PortableSetup {
             Action<string> speak=voice==null?null:(Action<string>)(text=> { voice.Stop(); voice.Speak(text); });
             action.Click+=delegate {
                 try {
-                    string game=Path.GetFullPath(folder.Text); Validate(root,game);
+                    string game=Path.GetFullPath(folder.Text); Validate(root,game,!remove);
                     string approvedHash=null;
                     if(!remove) {
                         approvedHash=ExistingHash(root,game);
