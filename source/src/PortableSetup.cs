@@ -23,6 +23,34 @@ public static class PortableSetup {
     const string Owner="VisualNovelHelper-Fata-v1";
     const string RecordName="VisualNovelHelper.install.json";
     static readonly JavaScriptSerializer Json=new JavaScriptSerializer();
+    public static bool NeedsSetup(string root,string data) {
+        try {
+            string saved=Path.Combine(data,"game-folder.txt");
+            if(!File.Exists(saved)) return true;
+            string game=File.ReadAllText(saved).Trim();
+            if(!Path.IsPathRooted(game) || !File.Exists(Path.Combine(game,"fata.exe"))) return true;
+            string target=Path.Combine(game,"AfterInit2.tjs");
+            var record=Owned(target,Path.Combine(game,RecordName));
+            return record.sha256!=Hash(Path.Combine(root,"bridge","AfterInit2.tjs"));
+        } catch { return true; }
+    }
+    public static int RemoveInstalled(string root) {
+        try {
+            string data=PortablePaths.Data(root), saved=Path.Combine(data,"game-folder.txt");
+            if(!File.Exists(saved)) return 0;
+            string game=File.ReadAllText(saved).Trim();
+            if(!Path.IsPathRooted(game)) throw new InvalidOperationException("The saved game folder is invalid. Open game setup to correct it before uninstalling.");
+            if(!File.Exists(Path.Combine(game,"AfterInit2.tjs"))) return 0;
+            string saves=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Mangagamer","The House in Fata Morgana");
+            try { Install(root,game,data,saves,true); }
+            catch(UnauthorizedAccessException) {
+                using(var worker=Process.Start(new ProcessStartInfo(Application.ExecutablePath,"--setup-worker "+Quote(game)+" "+Quote(data)+" "+Quote(saves)+" remove") {UseShellExecute=true,Verb="runas"})) {
+                    worker.WaitForExit(); return worker.ExitCode;
+                }
+            }
+            return 0;
+        } catch(Exception ex) { MessageBox.Show(ex.Message,"VHVN could not remove game integration",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
+    }
     public static string Hash(string path) {
         using(var sha=SHA256.Create()) using(var stream=File.OpenRead(path)) return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","");
     }
@@ -69,7 +97,7 @@ public static class PortableSetup {
             return "Removed the helper extension. Your saves, preferences and backups were kept.";
         }
         string stagedSource=Path.Combine(root,"bridge","AfterInit2.tjs");
-        if(!File.Exists(stagedSource)) throw new FileNotFoundException("The package is incomplete. Extract the whole ZIP again.");
+        if(!File.Exists(stagedSource)) throw new FileNotFoundException("The helper installation is incomplete. Run the VHVN installer again.");
         Directory.CreateDirectory(Path.Combine(data,"work"));
         // Probe permission before copying saves, so an elevation retry creates just one backup.
         string temp=Path.Combine(game,".vnh-"+Guid.NewGuid().ToString("N")+".tmp");
@@ -86,7 +114,7 @@ public static class PortableSetup {
             if(old==null) File.Move(temp,target); else File.Replace(temp,target,null);
             if(Hash(target)!=hash) throw new IOException("Installed extension hash verification failed.");
             File.WriteAllText(Path.Combine(data,"game-folder.txt"),game,Encoding.UTF8);
-            return "Installed. "+count+" save files backed up and verified.\n\nOpen the game through Steam, then open Start reading helper.cmd.\nHover a speaker's printed name to hear it.";
+            return "Ready. "+count+" save files backed up and verified.\n\nStart the game through Steam. VHVN will connect when the game opens.\nHover a speaker's printed name to hear it.";
         } finally { if(File.Exists(temp)) File.Delete(temp); }
     }
     public static IEnumerable<string> LibraryPaths(string text) {
@@ -123,9 +151,9 @@ public static class PortableSetup {
         b.Append('\\',slashes*2).Append('"'); return b.ToString();
     }
     public static int Run(string root,bool remove) {
-        Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+        bool completed=false;
         string data=PortablePaths.Data(root); Directory.CreateDirectory(Path.Combine(data,"work"));
-        using(var form=new Form {Text=remove?"Remove Visual Novel Helper":"Set up Visual Novel Helper",ClientSize=new Size(640,240),Font=new Font("Segoe UI",12),AutoScroll=true,AutoScaleMode=AutoScaleMode.Font,StartPosition=FormStartPosition.CenterScreen}) {
+        using(var form=new Form {Text=remove?"Remove VHVN game integration":"VHVN — first-time game setup",ClientSize=new Size(640,240),Font=new Font("Segoe UI",12),AutoScroll=true,AutoScaleMode=AutoScaleMode.Dpi,AutoScaleDimensions=new SizeF(96,96),StartPosition=FormStartPosition.CenterScreen}) {
             form.Controls.Add(new Label {Text="The House in Fata Morgana — English Steam build\nClose the game, then choose its folder.",Location=new Point(20,15),Size=new Size(600,55)});
             var folder=new TextBox {Location=new Point(20,85),Width=485,AccessibleName="Game folder"}; form.Controls.Add(folder);
             var found=FindGames(); if(found.Count>0) folder.Text=found[0];
@@ -144,15 +172,15 @@ public static class PortableSetup {
                         if(new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) throw;
                         string arguments="--setup-worker "+Quote(game)+" "+Quote(data)+" "+Quote(saves)+" "+(remove?"remove":"install");
                         using(var worker=Process.Start(new ProcessStartInfo(Application.ExecutablePath,arguments) {UseShellExecute=true,Verb="runas"})) { worker.WaitForExit(); if(worker.ExitCode!=0) return; }
-                        form.Close(); return;
+                        completed=true; form.Close(); return;
                     }
-                    MessageBox.Show(form,message,"Visual Novel Helper"); form.Close();
+                    completed=true; MessageBox.Show(form,message,"VHVN"); form.Close();
                 } catch(Exception ex) { MessageBox.Show(form,ex.Message,"Setup could not finish",MessageBoxButtons.OK,MessageBoxIcon.Error); }
             };
             WindowsSpeech voice=null; try { voice=new WindowsSpeech(); } catch(Exception) {}
             UiAccessibility.Wire(form,()=>voice!=null,voice==null?null:(Action<string>)(text=> { voice.Stop(); voice.Speak(text); }));
             try { Application.Run(form); } finally { if(voice!=null) voice.Dispose(); }
-            return 0;
+            return completed?0:1;
         }
     }
     public static int Worker(string root,string[] args) {

@@ -1,0 +1,42 @@
+name: Build and publish Windows installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [VERSION.txt]
+permissions:
+  contents: read
+concurrency:
+  group: vhvn-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install verified compiler in temporary directory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $download=Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $download
+          if ((Get-FileHash $download -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Compiler checksum mismatch' }
+          $destination=Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          $p=Start-Process $download -ArgumentList @('/PORTABLE=1','/CURRENTUSER','/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$destination+'"')) -WindowStyle Hidden -PassThru -Wait
+          if($p.ExitCode -ne 0) { throw 'Compiler installation failed' }
+          "ISCC_PATH=$destination\ISCC.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Package tested reader binary
+        shell: pwsh
+        run: ./installer/Build-Release.ps1 -Iscc $env:ISCC_PATH -SkipReaderBuild
+      - name: Publish release and installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version=(Get-Content VERSION.txt -Raw).Trim()
+          gh release view "v$version" --repo $env:GITHUB_REPOSITORY 2>$null
+          if($LASTEXITCODE -eq 0) { throw "Release v$version already exists. Bump VERSION.txt for a new release." }
+          gh release create "v$version" ./artifacts/VHVN-Setup.exe ./artifacts/SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "VHVN $version" --notes-file RELEASE_NOTES.md --latest
+          if($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

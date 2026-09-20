@@ -23,3 +23,4 @@ game-folder.txt
 .vs/
 # Build output; root bin contains the distributed application
 /source/bin/
+/artifacts/

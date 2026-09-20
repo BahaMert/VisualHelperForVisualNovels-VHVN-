@@ -37,7 +37,8 @@ public sealed class HelperWindow : Form {
     TextractorAdapter adapter;
     StructuredViewReader viewReader;
     DateTime gameStartUtc;
-    bool initialized;
+    bool initialized, waitingForGame;
+    DateTime nextGameCheck;
     public HelperWindow(string projectRoot, bool uiSmoke=false) {
         root=projectRoot;
         dataRoot=PortablePaths.Data(root);
@@ -52,7 +53,7 @@ public sealed class HelperWindow : Form {
         try { preferences=File.Exists(prefPath)?json.Deserialize<Preferences>(File.ReadAllText(prefPath)):new Preferences(); }
         catch { preferences=new Preferences(); }
         narrator=new NarrationController(speech);
-        Text="Visual Novel Helper"; ClientSize=new Size(640,540); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
+        Text="VHVN — Visual Helper for Visual Novels"; Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath); ClientSize=new Size(640,540); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
         Font=new Font("Segoe UI",12); StartPosition=FormStartPosition.CenterScreen;
         var heading=new Label { Text="Fata Morgana read-aloud", Font=new Font(Font.FontFamily,16,FontStyle.Bold), AutoSize=true, Location=new Point(20,16) };
         Controls.Add(heading);
@@ -80,7 +81,7 @@ public sealed class HelperWindow : Form {
         Controls.Add(new Label { Text="Advance normally. Hover choices, controls, backlog lines or a speaker's printed name to hear them.", Location=new Point(20,400), Size=new Size(600,55) });
         var readControls=new CheckBox {Text="Read helper controls aloud",AccessibleName="Read helper controls aloud",Checked=preferences.ReadControls,Location=new Point(20,470),Size=new Size(590,40)};
         readControls.CheckedChanged+=delegate { preferences.ReadControls=readControls.Checked; SaveSettings(); if(preferences.ReadControls) SpeakControl("Helper control reading on."); }; Controls.Add(readControls);
-        tray.Icon=SystemIcons.Information; tray.Text="Visual Novel Helper"; tray.Visible=true;
+        tray.Icon=Icon; tray.Text="VHVN"; tray.Visible=true;
         var menu=new ContextMenuStrip(); menu.Items.Add("Settings",null,delegate { Show(); WindowState=FormWindowState.Normal; Activate(); }); menu.Items.Add("Exit",null,delegate { Close(); }); tray.ContextMenuStrip=menu;
         tray.DoubleClick+=delegate { Show(); WindowState=FormWindowState.Normal; Activate(); };
         Resize+=delegate { if(WindowState==FormWindowState.Minimized) Hide(); };
@@ -151,6 +152,10 @@ public sealed class HelperWindow : Form {
     void Connect() {
         try {
             narrator.Stop(); if(adapter!=null) adapter.Dispose();
+            adapter=null; viewReader=null; waitingForGame=false;
+            if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length==0) {
+                waitingForGame=true; status.Text="Ready. Start Fata Morgana through Steam. I will connect automatically."; return;
+            }
             adapter=new TextractorAdapter(root,profile,log);
             adapter.Status+=s=> { status.Text=s; };
             adapter.DialogueReceived+=d=> {
@@ -166,6 +171,10 @@ public sealed class HelperWindow : Form {
     void Fail(Exception ex) { status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
     void Tick() {
         try {
+            if(waitingForGame && DateTime.UtcNow>=nextGameCheck) {
+                nextGameCheck=DateTime.UtcNow.AddSeconds(1);
+                if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length>0) Connect();
+            }
             bool focused=GameFocused(); narrator.SetFocus(focused);
             if(adapter!=null) {
                 if(viewReader!=null) {
@@ -188,8 +197,10 @@ public sealed class HelperWindow : Form {
 public static class Program {
     [STAThread] public static int Main(string[] args) {
         var root=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,".."));
+        Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length>0 && args[0]=="--setup") return PortableSetup.Run(root,false);
         if(args.Length>0 && args[0]=="--uninstall") return PortableSetup.Run(root,true);
+        if(args.Length>0 && args[0]=="--remove-installed-bridge") return PortableSetup.RemoveInstalled(root);
         if(args.Length==5 && args[0]=="--setup-worker") return PortableSetup.Worker(root,args);
         if(args.Length==3 && args[0]=="--portable-test") return PortableSelfTests.Run(root,args[1],args[2]);
         var dataRoot=PortablePaths.Data(root); Directory.CreateDirectory(dataRoot);
@@ -209,7 +220,12 @@ public static class Program {
         bool created;
         using(var mutex=new Mutex(true,"Local\\VisualNovelHelper",out created)) {
             if(!created) { MessageBox.Show("Visual Novel Helper is already running. Open it from the notification area."); return 1; }
-            try { Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); Application.Run(new HelperWindow(root,args.Length>0 && args[0]=="--ui-smoke")); trace("Exited normally"); return 0; }
+            try {
+                if(args.Length==0 && File.Exists(Path.Combine(root,"portable.txt")) && PortableSetup.NeedsSetup(root,dataRoot)) {
+                    if(PortableSetup.Run(root,false)!=0) return 1;
+                }
+                Application.Run(new HelperWindow(root,args.Length>0 && args[0]=="--ui-smoke")); trace("Exited normally"); return 0;
+            }
             catch(Exception ex) { File.WriteAllText(Path.Combine(dataRoot,"startup-error.log"),ex.ToString()); MessageBox.Show(ex.Message,"Visual Novel Helper"); return 1; }
             finally { mutex.ReleaseMutex(); }
         }

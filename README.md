@@ -1,10 +1,14 @@
 # VisualHelperForVisualNovel (VHVN)
 
+**[Download VHVN for Windows (.exe)](https://github.com/BahaMert/VisualHelperForVisualNovels-VHVN-/releases/latest/download/VHVN-Setup.exe)** · [All releases](https://github.com/BahaMert/VisualHelperForVisualNovels-VHVN-/releases)
+
+Download **VHVN-Setup.exe**, run it, and open **VHVN** from your desktop or Start menu. No command files, ZIP extraction, or developer tools are needed. The GitHub Source code ZIPs are for developers.
+
 A Windows read-aloud helper for **The House in Fata Morgana**, designed to make playing with low vision easier while keeping the game's normal controls.
 
 Click to advance dialogue as usual. The helper speaks the current passage and lets you hear supported choices, menu controls, and backlog entries by hovering over them. It does not choose answers, advance the story, or save/load for you.
 
-**Status: v0.2 preview.** Currently supports one verified English Steam build of the game. Other games, languages, and executable versions are not supported yet. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
+**Status: v0.2.1 preview.** Currently supports one verified English Steam build of the game. Other games, languages, and executable versions are not supported yet. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
 
 ## Requirements
 
@@ -16,16 +20,15 @@ Setup checks the game executable before installing. The helper is not tied to a 
 
 ## Download and install
 
-1. On this repository's GitHub page, select **Code → Download ZIP** (or clone the repository).
-2. Extract the entire ZIP to a folder you can keep, such as `Documents\VisualNovelHelper`. Keep all its files together; do not run it from inside the ZIP.
-3. **Close the game**, then open **Set up game helper.cmd** in the extracted folder.
-4. Check the detected game folder. If necessary, select **Browse** and choose the folder containing `fata.exe`. You can find it through Steam's **Manage → Browse local files**.
-5. Select **Install / update**. Windows may request permission to write to the game's folder; only setup needs this permission.
-6. Start the game through Steam, then open **Start reading helper.cmd**. Wait for **Connected**, and return to the game.
+1. **[Download VHVN-Setup.exe](https://github.com/BahaMert/VisualHelperForVisualNovels-VHVN-/releases/latest/download/VHVN-Setup.exe)** and run it.
+2. Follow the installer. It creates a Start menu entry and, by default, a desktop shortcut.
+3. Open **VHVN**. On the first launch, close the game and check the automatically detected game folder. If needed, use **Browse** to select the folder containing `fata.exe`.
+4. Select **Install / update** once. Windows may request permission to add the integration file to the game's folder; the reader runs under your normal account.
+5. Start the game through Steam. VHVN connects automatically when it opens.
 
-**Keep the helper folder separate from the game.** Leave the game wherever Steam installed it. Setup adds the integration file to the game's folder for you. You do not need developer tools, a PowerShell command, or a permanent script-policy change to use the helper.
+After that, just open **VHVN** alongside the game and play normally. You may open either one first. If the game folder changes or the bridge needs an update, VHVN shows game setup again.
 
-After the first setup, just start the game and the helper whenever you want to play.
+Leave the game wherever Steam installed it. The installer handles the helper's files separately; you do not need to move anything into the game folder yourself.
 
 ## Playing
 
@@ -57,21 +60,21 @@ Select **Save** to apply it or **Unassign** to remove it. Escape cancels key rec
 
 The helper uses larger native controls with accessible names and keyboard navigation. Use Tab and Shift+Tab to move between controls. **Read helper controls aloud** provides speech when controls receive focus or are hovered; turn it off if you prefer your own screen reader. Compatibility with every assistive-tool configuration is not yet verified.
 
-## Moving, updating, and removing
+## Updating and removing
 
-You can move the extracted helper folder as long as you keep its contents together. Preferences, logs, and verified save backups are stored under:
+Download and run the latest installer to update VHVN. Close the helper before updating. On the next launch, it checks whether the game's integration also needs updating.
+
+To uninstall, close the game and helper, then remove **VHVN - Visual Helper for Visual Novels** through Windows **Installed apps / Apps & features**. Uninstall removes only its verified game extension and installed application files. If the extension was changed or game integration cannot be removed, uninstall stops and explains the issue.
+
+Your saves, preferences, logs, and verified backups are kept. Helper data lives in:
 
 ```text
 %APPDATA%\VisualNovelHelper
 ```
 
-Run setup once on each new PC or Windows account.
+On another PC or Windows account, run the installer and complete first-time game setup again. There are no paths tied to the developer's PC.
 
-To update, close the game and helper, extract the new version, and run its **Set up game helper.cmd**. Setup updates only an extension it recognizes and whose ownership hash matches.
-
-To uninstall game integration, close the game and run **Remove game helper.cmd**. It removes only the helper's unchanged `AfterInit2.tjs` and ownership record. Saves and backups remain. You can then delete the extracted helper folder.
-
-If setup finds an unknown or modified `AfterInit2.tjs`, it refuses to overwrite it. Remove the old integration using its own uninstall procedure first. This also applies to early development copies that used a different ownership manifest.
+Setup refuses an unknown or modified `AfterInit2.tjs`. Remove an old integration using its own uninstall procedure first. Early development copies used a different ownership manifest and must be removed through their original installer before switching to this release.
 
 ## Troubleshooting and limits
 
@@ -82,7 +85,7 @@ If setup finds an unknown or modified `AfterInit2.tjs`, it refuses to overwrite 
 - **No audio:** check the selected Windows voice, volume, and speech setting, then focus the game.
 - **A control stays silent or a name is missing:** report the screen and the action that triggered it. Unusual layouts, restored text after loading, and complex passages still need broader testing.
 
-This is a preview, not a claim of complete game accessibility. The application is not signed with a commercial publisher certificate. Automated checks cover narration policy, bridge behavior, shortcut entry, UI startup, and relocated-package installation/update/removal; those checks do not replace testing with the player.
+This is a preview, not a claim of complete game accessibility. The application and installer are currently unsigned. Automated checks cover narration policy, bridge behavior, shortcut entry, UI startup, and relocated-package installation/update/removal; those checks do not replace testing with the player.
 
 ## Privacy
 
@@ -97,6 +100,8 @@ The reader is C# WinForms using `System.Speech`. Game capture and narration poli
 | `bin/` | Ready-to-run helper executable |
 | `source/src/` | C# reader, settings, setup, accessibility, and tests |
 | `source/build.ps1` | Build using the Windows .NET Framework compiler |
+| `installer/` | Windows installer definition and release build script |
+| `.github/workflows/release.yml` | Publish an EXE release when the version changes on main |
 | `bridge/AfterInit2.tjs` | Generated original game integration code |
 | `profiles/` | Verified game identity and control-label rules |
 | `tools/` | Bundled Textractor command-line capture and dependencies |
@@ -111,6 +116,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\source\build.ps1
 
 This allows scripts only in the launched PowerShell process. It outputs `source\bin\VisualNovelHelper.exe`. With the helper closed, copy that executable to the repository's `bin` folder to run it with the bundled profiles and tools. The generated bridge is shipped separately; this build step does not regenerate it. Some engine integration fixtures belong to the development workspace and are not included in this portable distribution.
 
+
+To build the EXE installer, use [Inno Setup 6.7.3](https://jrsoftware.org/isdl.php) and run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\Build-Release.ps1 -Iscc "C:\path\to\ISCC.exe"
+```
+
+This rebuilds the reader and outputs `artifacts\VHVN-Setup.exe` plus `SHA256SUMS.txt`. No scripts are needed by the player.
+
+For a release, update `VERSION.txt`, `source/src/AssemblyInfo.cs`, and the release notes, build/test the reader, and commit the updated `bin/VisualNovelHelper.exe` with its source. Pushing the version change to `main` runs the release workflow. It packages that tested binary using a checksum-pinned installer compiler and publishes the installer and checksum in GitHub Releases. An existing version is never overwritten. The workflow can also be started manually.
 Supported game executable SHA-256:
 
 ```text
