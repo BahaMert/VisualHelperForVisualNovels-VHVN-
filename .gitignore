@@ -1,0 +1,25 @@
+# Local state, saves, diagnostic captures, and developer scratch files
+/logs/
+/work/
+/backups/
+/saves/
+/tests/
+/outputs/
+/distribution/staging-*/
+preferences.json
+settings.json
+bridge-state.txt*
+bridge-install.json
+VisualNovelHelper.install.json
+game-folder.txt
+*.log
+*.jsonl
+*.dmp
+*.pdb
+*.user
+*.suo
+.env
+.env.*
+.vs/
+# Build output; root bin contains the distributed application
+/source/bin/

@@ -1,0 +1,8 @@
+﻿THIRD-PARTY COMPONENTS
+
+Fallback text capture uses unmodified Textractor v5.2.0 (Artikash and contributors), a separate process and hook DLL licensed under GPL-3.0.
+Official release: https://github.com/Artikash/Textractor/releases/tag/v5.2.0
+The matching source archive and full license are included in third-party. The source archive includes the project's build files. This bundle uses the x86 command-line reader and hook; translation extensions are not included or enabled.
+Microsoft C++ runtime DLLs accompanying that official release are included for its command-line reader. They remain Microsoft components under their applicable runtime redistribution terms, not the Textractor GPL license.
+Windows System.Speech and .NET Framework are system components and are not bundled.
+The helper's own C# source is in source; the generated original TJS bridge is in bridge. No copyrighted game scripts or assets are included.

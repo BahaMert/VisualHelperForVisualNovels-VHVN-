@@ -1,0 +1,13 @@
+{
+  "description": "Verified English names for Fata Morgana's bottom toolbar. Both graphic and action must match. These are developer-supplied labels, not OCR output.",
+  "evidence": "Installed system/MainWindow.tjs makeQExecMenu and its click handlers; scenario/qmenu.ks destinations.",
+  "buttons": [
+    { "graphic": "qmenu_exec01", "action": "kag.configQExecMenuClick()", "label": "Settings" },
+    { "graphic": "qmenu_exec02", "action": "kag.historyQExecMenuClick()", "label": "Backlog" },
+    { "graphic": "qmenu_exec03", "action": "kag.saveQExecMenuClick()", "label": "Save" },
+    { "graphic": "qmenu_exec04", "action": "kag.loadQExecMenuClick()", "label": "Load" },
+    { "graphic": "qmenu_exec05", "action": "kag.skipQExecMenuClick()", "label": "Skip" },
+    { "graphic": "qmenu_exec06", "action": "kag.autoQExecMenuClick()", "label": "Auto-read" },
+    { "graphic": "qmenu_exec07", "action": "kag.eraseQExecMenuClick()", "label": "Hide text" }
+  ]
+}

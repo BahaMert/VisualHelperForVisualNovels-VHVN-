@@ -1,0 +1,10 @@
+{
+  "name": "The House in Fata Morgana (English Steam build)",
+  "processName": "fata",
+  "exeSha256": "8AE01E946B52ECDC38D02B3F394B70793C7A4628D7A46D204030311B9B447A93",
+  "hookName": "KiriKiri1",
+  "hookOffset": "1240D0",
+  "contextOffset": "12A999",
+  "context2": "12",
+  "cliRelativePath": "tools/Textractor-5.2.0/Textractor/x86/TextractorCLI.exe"
+}

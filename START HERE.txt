@@ -1,0 +1,36 @@
+﻿VISUAL NOVEL HELPER — START HERE
+
+For Windows 10/11 x64 and the tested English Steam release of The House in Fata Morgana. Other game versions/languages are not yet verified. Setup checks compatibility before making changes.
+
+FIRST TIME
+1. Extract the entire ZIP into a folder you can keep, such as Documents. Do not run it from inside the ZIP.
+2. Close the game. Open Set up game helper.cmd.
+3. Check the detected game folder, or use Browse to find the folder containing fata.exe. Select Install / update. Windows may ask permission for the game folder; only setup needs that permission.
+4. Start the game through Steam, then open Start reading helper.cmd. Wait for Connected and return to the game.
+
+PLAYING
+Click to advance normally. Supported lines speak while their letters appear. Complex lines may wait until their text finishes appearing. Hover choices, menu items or backlog lines to hear them.
+Hover directly over the printed speaker name for a moment to hear it. Names are not added to every sentence. Leave and hover again to repeat the name.
+The game still controls all choices, saving and loading. The helper does not click or advance for you.
+
+ACCESSIBLE HELPER SETTINGS
+Tab and Shift+Tab navigate controls. Enter activates the current button. Escape closes the shortcut dialog.
+Helper controls read aloud when focused or hovered. Turn off Read helper controls aloud if you prefer a separate screen reader.
+Repeat key and Toggle key accept typed shortcuts, such as F9 or Alt+R, as well as a list. Record keys lets you press the combination directly; Escape cancels recording. Select Save to apply, or Unassign to remove a binding. No keys are assigned by default. Use keys that do not conflict with your game.
+Voice, speed, volume and key preferences stay on this Windows account.
+Minimizing puts the helper in the notification area. Open its Settings there or choose Exit.
+
+MOVING, UPDATING AND REMOVING
+You may move the extracted helper folder; it contains no installation path pointing to its old location. Keep its files together. Preferences, local logs and verified save backups are under %APPDATA%\VisualNovelHelper.
+On a different PC or Windows account, run Set up game helper.cmd once. No developer tools, PowerShell commands or global script-policy changes are needed.
+For a new package version, close the game/helper, extract the new package, and run its Set up game helper.cmd to update the game extension.
+To remove game integration, close the game and use Remove game helper.cmd. Only the helper's unchanged, hash-verified AfterInit2.tjs and ownership record are removed. Saves and backups remain. You can then delete the extracted helper folder.
+An unknown existing AfterInit2.tjs is never overwritten. If setup reports a conflict, use the old mod/helper's own uninstall procedure first.
+The helper is a prototype, not signed with a commercial publisher certificate. Actual Narrator/Magnifier behavior and full-game coverage still need testing with the player.
+
+PRIVACY AND SUPPORT
+Speech runs through installed Windows voices. No game text is sent to a cloud speech service. Local logs may contain story text/spoilers; do not share the whole AppData folder casually. This package contains no game assets, saves, personal preferences or capture logs.
+Close other Textractor sessions before using the helper. If attachment fails, close the helper, restart the game, then reopen the helper. Run the reader under your normal Windows account.
+
+Tested game executable SHA256:
+8AE01E946B52ECDC38D02B3F394B70793C7A4628D7A46D204030311B9B447A93

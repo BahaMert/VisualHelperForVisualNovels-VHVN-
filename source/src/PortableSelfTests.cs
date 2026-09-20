@@ -1,0 +1,48 @@
+using System;
+using System.IO;
+using System.Linq;
+namespace VisualNovelHelper {
+public static class PortableSelfTests {
+    static void Check(bool value,string name) { if(!value) throw new Exception(name); }
+    static void Refuses(Action action,string name) {
+        bool refused=false; try { action(); } catch(InvalidOperationException) { refused=true; }
+        Check(refused,name);
+    }
+    public static int Run(string root,string fixtureExe,string workspace) {
+        Directory.CreateDirectory(workspace);
+        try {
+            string game=Path.Combine(workspace,"Game with spaces"), data=Path.Combine(workspace,"New user's state"), saves=Path.Combine(workspace,"Invented saves");
+            Directory.CreateDirectory(game); Directory.CreateDirectory(saves);
+            File.Copy(fixtureExe,Path.Combine(game,"fata.exe"),true);
+            File.WriteAllText(Path.Combine(saves,"test.save"),"invented save fixture");
+            string target=Path.Combine(game,"AfterInit2.tjs");
+            File.WriteAllText(target,"unrelated extension");
+            Refuses(()=>PortableSetup.Install(root,game,data,saves,false),"unknown extension refused");
+            Check(File.ReadAllText(target)=="unrelated extension","unrelated extension unchanged");
+            File.Delete(target); // Only this test's known single file.
+            PortableSetup.Install(root,game,data,saves,false);
+            string hash=PortableSetup.Hash(target);
+            Check(hash==PortableSetup.Hash(Path.Combine(root,"bridge","AfterInit2.tjs")),"installed package bytes");
+            Check(File.ReadAllText(Path.Combine(saves,"test.save"))=="invented save fixture","original save unchanged");
+            Check(Directory.GetFiles(Path.Combine(data,"backups"),"test.save",SearchOption.AllDirectories).Length==1,"verified save backup");
+            PortableSetup.Install(root,game,data,saves,false);
+            Check(PortableSetup.Hash(target)==hash,"owned update");
+            File.AppendAllText(target," changed");
+            Refuses(()=>PortableSetup.Install(root,game,data,saves,true),"modified extension removal refused");
+            Refuses(()=>PortableSetup.Install(root,game,data,saves,false),"modified extension update refused");
+            File.Copy(Path.Combine(root,"bridge","AfterInit2.tjs"),target,true);
+            PortableSetup.Install(root,game,data,saves,true);
+            Check(!File.Exists(target) && !File.Exists(Path.Combine(game,"VisualNovelHelper.install.json")),"only owned files uninstalled");
+            Check(File.Exists(Path.Combine(saves,"test.save")),"uninstall preserves saves");
+            PortableSetup.Install(root,game,data,Path.Combine(workspace,"No saves yet"),false);
+            PortableSetup.Install(root,game,data,saves,true);
+            File.AppendAllText(Path.Combine(game,"fata.exe"),"unknown build");
+            Refuses(()=>PortableSetup.Install(root,game,data,saves,false),"unsupported executable refused");
+            var paths=PortableSetup.LibraryPaths("\"path\" \"D:\\\\SteamLibrary\"\n\"1\" \"E:\\\\Games\"\n\"2\" \"100\"").ToArray();
+            Check(paths.Length==2 && paths[0]==@"D:\SteamLibrary" && paths[1]==@"E:\Games","Steam modern/legacy libraries");
+            File.WriteAllText(Path.Combine(workspace,"result.txt"),"PASS: relocated package; fresh install; owned update/removal; no-saves first install; save backups; unrelated/modified extension and unsupported build rejection; Steam library parsing.");
+            return 0;
+        } catch(Exception ex) { File.WriteAllText(Path.Combine(workspace,"result.txt"),ex.ToString()); return 1; }
+    }
+}
+}
