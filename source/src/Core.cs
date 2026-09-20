@@ -26,6 +26,7 @@ public sealed class Log : IDisposable {
 public sealed class Dialogue {
     public string Text;
     public string Source;
+    public bool RememberForRepeat=true;
 }
 public interface ISpeechOutput : IDisposable {
     void Speak(string text);
@@ -39,13 +40,14 @@ public sealed class NarrationController {
     public NarrationController(ISpeechOutput output) { speech=output; Enabled=true; }
     public void SetFocus(bool focused) { if (Focused && !focused) speech.Stop(); Focused=focused; }
     public void Receive(Dialogue line) {
-        Current=line.Text;
+        if(line.RememberForRepeat) Current=line.Text;
         // Both semantic passages and fallback capture emissions replace current speech.
-        if (Enabled && Focused) { speech.Stop(); speech.Speak(Current); }
+        if (Enabled && Focused) { speech.Stop(); speech.Speak(line.Text); }
     }
     public void Toggle() { Enabled=!Enabled; if (!Enabled) speech.Stop(); }
     public void Repeat() { if (Enabled && !String.IsNullOrWhiteSpace(Current)) { speech.Stop(); speech.Speak(Current); } }
     public void Stop() { speech.Stop(); }
+    public void ClearDialogue() { Current=null; }
 }
 public sealed class FataLineParser {
     static readonly Regex Header = new Regex(@"^\[([0-9A-F]+):([0-9A-F]+):([0-9A-F]+):([0-9A-F]+):([0-9A-F]+):([^:]+):([^\]]+)\] ?(.*)$", RegexOptions.IgnoreCase);

@@ -80,10 +80,12 @@ public static class ViewSelfTests {
         Check(p.Update(ready,true,now.AddSeconds(24.2)).Text==null,"closing confirmation does not replay dialogue");
         ready.Hover=new ViewItem {Id="speaker:0",Text="Test Speaker"};
         Check(p.Update(ready,true,now.AddSeconds(25)).Text==null,"speaker waits for intentional hover dwell");
-        Check(p.Update(ready,true,now.AddSeconds(25.3)).Text=="Test Speaker","speaker name spoken only on hover");
+        var nameDecision=p.Update(ready,true,now.AddSeconds(25.3));
+        Check(nameDecision.Text=="Test Speaker" && !nameDecision.IsDialogue,"speaker hover is transient, never repeatable dialogue");
         Check(p.Update(ready,true,now.AddSeconds(26)).Text==null,"stationary speaker not repeated");
         ready.Items[0].Id="p:3"; ready.Hover.Text="New Speaker";
-        Check(p.Update(ready,true,now.AddSeconds(27)).Text=="Same words","dialogue advance still reads without automatic name");
+        var passageDecision=p.Update(ready,true,now.AddSeconds(27));
+        Check(passageDecision.Text=="Same words" && passageDecision.IsDialogue,"dialogue advance remains repeatable without automatic name");
         Check(p.Update(ready,true,now.AddSeconds(27.3)).Text==null,"stationary pointer does not read changed speaker");
         ready.Hover=null; p.Update(ready,true,now.AddSeconds(28));
         ready.Hover=new ViewItem {Id="speaker:0",Text="New Speaker"}; p.Update(ready,true,now.AddSeconds(29));

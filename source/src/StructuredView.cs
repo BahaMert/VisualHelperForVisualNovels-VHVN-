@@ -61,7 +61,7 @@ public static class ViewProtocol {
         } catch(FormatException) { return null; }
     }
 }
-public sealed class ViewDecision { public bool Stop; public string Text; }
+public sealed class ViewDecision { public bool Stop, IsDialogue; public string Text; }
 public sealed class ViewNarration {
     string session, layout, selection, pending, spoken, mode, title;
     string lastPassage, lastBuilding;
@@ -102,7 +102,7 @@ public sealed class ViewNarration {
                 lastBuilding=identity;
             } else if(identity!=lastPassage) {
                 // No hover dwell or glyph idle timeout at a semantic dialogue boundary.
-                d.Stop=true; d.Text=Say(view.Items[0].Text); lastPassage=identity;
+                d.Stop=true; d.Text=Say(view.Items[0].Text); d.IsDialogue=true; lastPassage=identity;
             }
             return d;
         }

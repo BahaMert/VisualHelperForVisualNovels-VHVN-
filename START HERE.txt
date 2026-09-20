@@ -7,11 +7,13 @@ VHVN — START HERE
 
 After setup, just open VHVN alongside the game. No command files or developer tools are needed.
 
+Repeat rereads the latest dialogue passage, never a speaker name or menu label. Shortcuts act only in the focused game; those keys type normally in other apps.
+
 Click to advance normally. Hover supported choices, menu items and backlog entries to hear them. Hover the printed speaker name briefly to hear it on demand; names are not automatically added to dialogue.
 
 Voice, speed, volume and optional shortcuts are in the helper. Type a shortcut, select it or use Record keys. Save applies; Unassign clears. Tab and Shift+Tab navigate controls. Read helper controls aloud can be turned off if you prefer your own screen reader.
 
-Close the helper and run a new installer to update. Close the game/helper and use Windows Installed apps / Apps & features to uninstall VHVN. Saves, settings and backups stay in place. Game integration is removed only after ownership/hash checks succeed.
+Close the helper and run a new installer to update. If game setup detects a recognized earlier helper, choose Replace helper or Cancel in the spoken confirmation. The old extension is backed up; no manual file deletion is required. Close the game/helper and use Windows Installed apps / Apps & features to uninstall VHVN. Saves, settings and backups stay in place. Game integration is removed only after ownership/hash checks succeed.
 
 Requires Windows 10/11 x64, installed Windows speech voices and the supported English Steam game build. Other builds/languages are not yet verified. First-time setup may need permission to write in the game folder. The reader runs normally.
 

@@ -66,11 +66,34 @@ public static class PortableSetup {
         }
     }
     static InstallRecord Owned(string target,string record) {
-        if(!File.Exists(record)) throw new InvalidOperationException("An existing AfterInit2.tjs belongs to another installation. Nothing was replaced. Remove that extension using its original installer first.");
+        if(!File.Exists(record)) throw new InvalidOperationException("The existing integration has no ownership record.");
         InstallRecord info;
         try { info=Json.Deserialize<InstallRecord>(File.ReadAllText(record)); } catch { throw new InvalidOperationException("The helper ownership record is unreadable. Nothing was replaced."); }
         if(info==null || info.owner!=Owner || info.sha256!=Hash(target)) throw new InvalidOperationException("The installed extension has changed. Setup will not overwrite or remove it.");
         return info;
+    }
+    public static string BridgeBodyHash(string path) {
+        string text=File.ReadAllText(path).Replace("\r\n","\n");
+        int end=text.IndexOf('\n'); if(end<0) return null;
+        string header=text.Substring(0,end);
+        // Older development builds used a literal output path. Ignore only that declaration,
+        // never arbitrary code or the rest of a bridge, when recognizing known versions.
+        if(!Regex.IsMatch(header,"^var vnhOutputPath = \"(?:[^\"\\\\\r\n]|\\\\.)*\";$") &&
+            header!="var vnhOutputPath = System.appDataPath + \"VisualNovelHelper/work/bridge-state.txt\";") return null;
+        using(var sha=SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text.Substring(end+1).TrimEnd('\r','\n')))).Replace("-","");
+    }
+    static InstallRecord Recognized(string root,string target,string record) {
+        try { return Owned(target,record); } catch(InvalidOperationException) {}
+        string bodyHash=BridgeBodyHash(target);
+        string list=Path.Combine(root,"profiles","legacy-bridges.json");
+        var known=File.Exists(list)?Json.Deserialize<string[]>(File.ReadAllText(list)):new string[0];
+        if(bodyHash!=null && known!=null && Array.IndexOf(known,bodyHash)>=0)
+            return new InstallRecord {owner=Owner,sha256=Hash(target)};
+        throw new InvalidOperationException("An existing game extension is not a recognized VHVN version. It was left unchanged to protect other mods. Contact VHVN support with this message; you do not need to delete files yourself.");
+    }
+    public static string ExistingHash(string root,string game) {
+        string target=Path.Combine(game,"AfterInit2.tjs");
+        return File.Exists(target)?Recognized(root,target,Path.Combine(game,RecordName)).sha256:null;
     }
     static int CopyVerified(string source,string destination) {
         if(!Directory.Exists(source)) return 0;
@@ -84,18 +107,22 @@ public static class PortableSetup {
         foreach(string child in Directory.GetDirectories(source)) count+=CopyVerified(child,Path.Combine(destination,Path.GetFileName(child)));
         return count;
     }
-    public static string Install(string root,string game,string data,string saves,bool remove) {
+    public static string Install(string root,string game,string data,string saves,bool remove,string approvedExistingHash=null) {
         game=Path.GetFullPath(game); data=Path.GetFullPath(data);
         Validate(root,game);
         string target=Path.Combine(game,"AfterInit2.tjs"), record=Path.Combine(game,RecordName);
         InstallRecord old=null;
-        if(File.Exists(target)) old=Owned(target,record);
+        if(File.Exists(target)) old=remove?Owned(target,record):Recognized(root,target,record);
         if(remove) {
             if(old==null) return "The helper extension is already removed.";
             // Recheck ownership immediately before deleting the single owned extension.
             Owned(target,record); File.Delete(target); File.Delete(record);
             return "Removed the helper extension. Your saves, preferences and backups were kept.";
         }
+        if(old!=null && old.sha256!=approvedExistingHash)
+            throw new InvalidOperationException("The existing helper must be confirmed before replacement. Please choose Install / update again.");
+        if(old==null && approvedExistingHash!=null)
+            throw new InvalidOperationException("The game integration changed after confirmation. Please review setup again.");
         string stagedSource=Path.Combine(root,"bridge","AfterInit2.tjs");
         if(!File.Exists(stagedSource)) throw new FileNotFoundException("The helper installation is incomplete. Run the VHVN installer again.");
         Directory.CreateDirectory(Path.Combine(data,"work"));
@@ -105,11 +132,16 @@ public static class PortableSetup {
         try {
             string backup=Path.Combine(data,"backups",DateTime.Now.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,6));
             int count=CopyVerified(saves,Path.Combine(backup,"saves"));
-            if(old!=null) { Directory.CreateDirectory(backup); File.Copy(target,Path.Combine(backup,"AfterInit2.tjs")); }
+            if(old!=null) {
+                Directory.CreateDirectory(backup); string previous=Path.Combine(backup,"AfterInit2.tjs"); File.Copy(target,previous);
+                if(Hash(previous)!=old.sha256) throw new IOException("The previous helper changed during backup. Nothing was replaced.");
+                if(File.Exists(record)) File.Copy(record,Path.Combine(backup,RecordName));
+            }
             File.Copy(stagedSource,temp,true); string hash=Hash(temp);
             // Record first: a crash can leave a conservative hash mismatch, never unowned deletion.
             string metadata=Json.Serialize(new InstallRecord {owner=Owner,sha256=hash});
-            if(old!=null) Owned(target,record);
+            if(old!=null && Hash(target)!=approvedExistingHash) throw new IOException("The previous helper changed after confirmation. Nothing was replaced.");
+            if(old==null && File.Exists(target)) throw new IOException("A game extension appeared during setup. Nothing was replaced.");
             File.WriteAllText(record,metadata,Encoding.UTF8);
             if(old==null) File.Move(temp,target); else File.Replace(temp,target,null);
             if(Hash(target)!=hash) throw new IOException("Installed extension hash verification failed.");
@@ -162,30 +194,58 @@ public static class PortableSetup {
             browse.Click+=delegate { using(var chooser=new FolderBrowserDialog {Description="Select the folder containing fata.exe",SelectedPath=folder.Text}) if(chooser.ShowDialog(form)==DialogResult.OK) folder.Text=chooser.SelectedPath; };
             var action=new Button {Text=remove?"Remove helper":"Install / update",Location=new Point(20,145),Size=new Size(190,40)}; form.Controls.Add(action); form.AcceptButton=action;
             form.Controls.Add(new Label {Text="Windows may request permission to write in the game folder.\nThe reader itself runs normally; saves are preserved.",Location=new Point(225,143),Size=new Size(395,65)});
+            WindowsSpeech voice=null; try { voice=new WindowsSpeech(); } catch(Exception) {}
+            Action<string> speak=voice==null?null:(Action<string>)(text=> { voice.Stop(); voice.Speak(text); });
             action.Click+=delegate {
                 try {
                     string game=Path.GetFullPath(folder.Text); Validate(root,game);
+                    string approvedHash=null;
+                    if(!remove) {
+                        approvedHash=ExistingHash(root,game);
+                        if(approvedHash!=null && !ConfirmReplacement(form,speak)) return;
+                    }
                     string saves=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Mangagamer","The House in Fata Morgana");
                     string message;
-                    try { message=Install(root,game,data,saves,remove); }
+                    try { message=Install(root,game,data,saves,remove,approvedHash); }
                     catch(UnauthorizedAccessException) {
                         if(new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) throw;
-                        string arguments="--setup-worker "+Quote(game)+" "+Quote(data)+" "+Quote(saves)+" "+(remove?"remove":"install");
+                        string arguments="--setup-worker "+Quote(game)+" "+Quote(data)+" "+Quote(saves)+" "+(remove?"remove":"install")+(approvedHash==null?"":" "+approvedHash);
                         using(var worker=Process.Start(new ProcessStartInfo(Application.ExecutablePath,arguments) {UseShellExecute=true,Verb="runas"})) { worker.WaitForExit(); if(worker.ExitCode!=0) return; }
                         completed=true; form.Close(); return;
                     }
                     completed=true; MessageBox.Show(form,message,"VHVN"); form.Close();
                 } catch(Exception ex) { MessageBox.Show(form,ex.Message,"Setup could not finish",MessageBoxButtons.OK,MessageBoxIcon.Error); }
             };
-            WindowsSpeech voice=null; try { voice=new WindowsSpeech(); } catch(Exception) {}
-            UiAccessibility.Wire(form,()=>voice!=null,voice==null?null:(Action<string>)(text=> { voice.Stop(); voice.Speak(text); }));
+            UiAccessibility.Wire(form,()=>voice!=null,speak);
             try { Application.Run(form); } finally { if(voice!=null) voice.Dispose(); }
             return completed?0:1;
         }
     }
     public static int Worker(string root,string[] args) {
-        try { MessageBox.Show(Install(root,args[1],args[2],args[3],args[4]=="remove"),"Visual Novel Helper"); return 0; }
+        try { MessageBox.Show(Install(root,args[1],args[2],args[3],args[4]=="remove",args.Length==6?args[5]:null),"Visual Novel Helper"); return 0; }
         catch(Exception ex) { MessageBox.Show(ex.Message,"Setup could not finish",MessageBoxButtons.OK,MessageBoxIcon.Error); return 1; }
+    }
+    public static void ConfirmationSmoke(string path) {
+        if(ConfirmReplacement(null,null,path)) throw new Exception("Closing replacement confirmation must cancel.");
+    }
+    static bool ConfirmReplacement(Form owner,Action<string> speak,string smokePath=null) {
+        using(var dialog=new Form {Text="Update existing VHVN helper?",ClientSize=new Size(600,230),Font=new Font("Segoe UI",12),AutoScaleDimensions=new SizeF(96,96),AutoScaleMode=AutoScaleMode.Dpi,AutoScroll=true,StartPosition=FormStartPosition.CenterParent,MinimizeBox=false,MaximizeBox=false}) {
+            const string message="An existing VHVN helper was found in the game. Replace it with this version?\n\nYour saves and settings will be kept. The previous helper will be backed up. No folder cleanup is needed.";
+            dialog.Controls.Add(new Label {Text=message,AccessibleName=message,Location=new Point(20,20),Size=new Size(560,130)});
+            var yes=new Button {Text="&Replace helper",AccessibleName="Replace existing helper",DialogResult=DialogResult.Yes,Location=new Point(20,170),Size=new Size(230,40)};
+            var no=new Button {Text="&Cancel",AccessibleName="Cancel and keep existing helper",DialogResult=DialogResult.Cancel,Location=new Point(350,170),Size=new Size(230,40)};
+            dialog.Controls.Add(yes); dialog.Controls.Add(no); dialog.AcceptButton=yes; dialog.CancelButton=no;
+            UiAccessibility.Wire(dialog,()=>speak!=null,speak);
+            dialog.Shown+=delegate {
+                if(speak!=null) speak(message+" Replace helper, or Cancel.");
+                if(smokePath!=null) {
+                    Application.DoEvents();
+                    using(var bitmap=new Bitmap(dialog.Width,dialog.Height)) { dialog.DrawToBitmap(bitmap,new Rectangle(0,0,dialog.Width,dialog.Height)); bitmap.Save(smokePath); }
+                    dialog.BeginInvoke((Action)(()=> { dialog.DialogResult=DialogResult.Cancel; dialog.Close(); }));
+                }
+            };
+            return dialog.ShowDialog(owner)==DialogResult.Yes;
+        }
     }
 }
 }

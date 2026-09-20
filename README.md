@@ -8,7 +8,7 @@ A Windows read-aloud helper for **The House in Fata Morgana**, designed to make 
 
 Click to advance dialogue as usual. The helper speaks the current passage and lets you hear supported choices, menu controls, and backlog entries by hovering over them. It does not choose answers, advance the story, or save/load for you.
 
-**Status: v0.2.1 preview.** Currently supports one verified English Steam build of the game. Other games, languages, and executable versions are not supported yet. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
+**Status: v0.2.2 preview.** Currently supports one verified English Steam build of the game. Other games, languages, and executable versions are not supported yet. Full-game coverage and use with players' screen readers and Magnifier setups still need testing.
 
 ## Requirements
 
@@ -48,7 +48,7 @@ Leaving the game stops gameplay speech. Returning does not automatically replay 
 
 ## Voice and shortcuts
 
-Configure voice, speed, and volume in the helper. Repeat and speech-toggle shortcuts are **unassigned by default**, since keys such as Ctrl and Shift are already used by visual novels.
+Configure voice, speed, and volume in the helper. Repeat and speech-toggle shortcuts are **unassigned by default**, since keys such as Ctrl and Shift are already used by visual novels. **Repeat always rereads the latest dialogue passage**, even after a speaker name, menu item, or backlog entry was spoken. Speaker names are read only by hovering over them.
 
 To set a shortcut, open its editor and either:
 
@@ -56,7 +56,7 @@ To set a shortcut, open its editor and either:
 - Choose a key from the list.
 - Select **Record keys** and press the combination directly.
 
-Select **Save** to apply it or **Unassign** to remove it. Escape cancels key recording. Choose a combination that does not conflict with the game or your assistive software.
+Select **Save** to apply it or **Unassign** to remove it. Escape cancels key recording. Shortcuts act only while the game has focus. In other apps, the same keys work normally, so you can type messages or email without closing VHVN. Choose a combination that does not conflict with the game or your assistive software.
 
 The helper uses larger native controls with accessible names and keyboard navigation. Use Tab and Shift+Tab to move between controls. **Read helper controls aloud** provides speech when controls receive focus or are hovered; turn it off if you prefer your own screen reader. Compatibility with every assistive-tool configuration is not yet verified.
 
@@ -74,7 +74,7 @@ Your saves, preferences, logs, and verified backups are kept. Helper data lives 
 
 On another PC or Windows account, run the installer and complete first-time game setup again. There are no paths tied to the developer's PC.
 
-Setup refuses an unknown or modified `AfterInit2.tjs`. Remove an old integration using its own uninstall procedure first. Early development copies used a different ownership manifest and must be removed through their original installer before switching to this release.
+When setup finds a recognized earlier VHVN integration, including supported early development copies without an ownership record, it asks **Replace helper** or **Cancel**. The prompt can be spoken and operated by keyboard. Replacement backs up the previous extension and preserves saves and settings; cancellation leaves the old installation untouched. You do not need to find or delete files. An unrelated or unrecognized modified extension is left unchanged to protect other mods.
 
 ## Troubleshooting and limits
 

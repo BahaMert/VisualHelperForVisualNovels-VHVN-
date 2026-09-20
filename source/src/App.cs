@@ -17,8 +17,6 @@ public sealed class WindowsSpeech : ISpeechOutput {
 public sealed class HelperWindow : Form {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
-    [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr window,int id,uint modifiers,uint key);
-    [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr window,int id);
     readonly string root, dataRoot;
     readonly Log log;
     readonly JavaScriptSerializer json=new JavaScriptSerializer();
@@ -36,6 +34,7 @@ public sealed class HelperWindow : Form {
     readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer();
     TextractorAdapter adapter;
     StructuredViewReader viewReader;
+    GameShortcuts shortcuts;
     DateTime gameStartUtc;
     bool initialized, waitingForGame;
     DateTime nextGameCheck;
@@ -100,16 +99,16 @@ public sealed class HelperWindow : Form {
                 Directory.CreateDirectory(Path.Combine(root,"tests"));
                 using(var bitmap=new Bitmap(Width,Height)) { DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height)); bitmap.Save(Path.Combine(root,"tests","helper-ui.png")); }
                 ShortcutDialog.Smoke(Path.Combine(root,"tests","shortcut-ui.png"));
+                PortableSetup.ConfirmationSmoke(Path.Combine(root,"tests","replacement-ui.png"));
                 var closer=new System.Windows.Forms.Timer { Interval=1500 };
                 closer.Tick+=delegate { closer.Stop(); closer.Dispose(); Close(); };
                 closer.Start(); return;
             }
-            bool a=preferences.RepeatKey==0 || RegisterHotKey(Handle,1,0x4000|(uint)preferences.RepeatModifiers,(uint)preferences.RepeatKey);
-            bool b=preferences.ToggleKey==0 || RegisterHotKey(Handle,2,0x4000|(uint)preferences.ToggleModifiers,(uint)preferences.ToggleKey);
-            if(!a || !b) { log.Write("hotkey-error","Shortcut already in use; use window buttons."); MessageBox.Show(this,"A shortcut is already in use. Repeat and toggle remain available in this window."); }
+            try { shortcuts=new GameShortcuts(Handle); shortcuts.Configure(preferences); }
+            catch(Exception ex) { log.Write("shortcut-error",ex.Message); MessageBox.Show(this,"Game shortcuts could not be enabled. The Repeat and Speech buttons still work."); }
             Connect();
         };
-        FormClosed+=delegate { timer.Stop(); UnregisterHotKey(Handle,1); UnregisterHotKey(Handle,2); narrator.Stop(); if(adapter!=null) adapter.Dispose(); tray.Dispose(); speech.Dispose(); log.Write("closed",true); log.Dispose(); };
+        FormClosed+=delegate { timer.Stop(); if(shortcuts!=null) shortcuts.Dispose(); narrator.Stop(); if(adapter!=null) adapter.Dispose(); tray.Dispose(); speech.Dispose(); log.Write("closed",true); log.Dispose(); };
     }
     void AddButton(string label,int x,int y,int width,Action action) { var button=new Button { Text=label, Location=new Point(x,y), Size=new Size(width,38) }; button.Click+=delegate { action(); }; Controls.Add(button); }
     void SpeakControl(string text) { speech.Stop(); speech.Speak(text); }
@@ -122,22 +121,15 @@ public sealed class HelperWindow : Form {
         int key=repeat?preferences.RepeatKey:preferences.ToggleKey, modifiers=repeat?preferences.RepeatModifiers:preferences.ToggleModifiers;
         using(var dialog=new ShortcutDialog(repeat?"Repeat":"Toggle speech",key,modifiers,preferences.ReadControls?(Action<string>)SpeakControl:null)) {
             DialogResult outcome;
-            UnregisterHotKey(Handle,1); UnregisterHotKey(Handle,2);
+            if(shortcuts!=null) shortcuts.Suspended=true;
             try { outcome=dialog.ShowDialog(this); }
-            finally {
-                if(preferences.RepeatKey!=0) RegisterHotKey(Handle,1,0x4000|(uint)preferences.RepeatModifiers,(uint)preferences.RepeatKey);
-                if(preferences.ToggleKey!=0) RegisterHotKey(Handle,2,0x4000|(uint)preferences.ToggleModifiers,(uint)preferences.ToggleKey);
-            }
+            finally { if(shortcuts!=null) shortcuts.Suspended=false; }
             if(outcome!=DialogResult.OK) return;
             int otherKey=repeat?preferences.ToggleKey:preferences.RepeatKey, otherModifiers=repeat?preferences.ToggleModifiers:preferences.RepeatModifiers;
             if(dialog.SelectedKey!=0 && dialog.SelectedKey==otherKey && dialog.SelectedModifiers==otherModifiers) { MessageBox.Show(this,"Choose a different shortcut for each action."); return; }
-            int id=repeat?1:2; UnregisterHotKey(Handle,id);
-            if(dialog.SelectedKey!=0 && !RegisterHotKey(Handle,id,0x4000|(uint)dialog.SelectedModifiers,(uint)dialog.SelectedKey)) {
-                if(key!=0) RegisterHotKey(Handle,id,0x4000|(uint)modifiers,(uint)key);
-                MessageBox.Show(this,"That shortcut is already in use. Your previous setting has been kept."); return;
-            }
             if(repeat) { preferences.RepeatKey=dialog.SelectedKey; preferences.RepeatModifiers=dialog.SelectedModifiers; }
             else { preferences.ToggleKey=dialog.SelectedKey; preferences.ToggleModifiers=dialog.SelectedModifiers; }
+            if(shortcuts!=null) shortcuts.Configure(preferences);
             UpdateShortcutLabels(); SaveSettings(); log.Write("shortcut-changed",new { action=repeat?"repeat":"toggle",key=dialog.SelectedKey,modifiers=dialog.SelectedModifiers });
         }
     }
@@ -151,7 +143,7 @@ public sealed class HelperWindow : Form {
     bool GameFocused() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(),out pid); return adapter!=null && pid==adapter.GamePid; }
     void Connect() {
         try {
-            narrator.Stop(); if(adapter!=null) adapter.Dispose();
+            narrator.Stop(); narrator.ClearDialogue(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) adapter.Dispose();
             adapter=null; viewReader=null; waitingForGame=false;
             if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length==0) {
                 waitingForGame=true; status.Text="Ready. Start Fata Morgana through Steam. I will connect automatically."; return;
@@ -164,11 +156,12 @@ public sealed class HelperWindow : Form {
                 log.Write("narration-decision",new { enabled=narrator.Enabled, gameFocused=narrator.Focused, structuredViewSuppressed=suppressed });
             };
             adapter.Start();
+            if(shortcuts!=null) shortcuts.GamePid=adapter.GamePid;
             using(var game=System.Diagnostics.Process.GetProcessById(adapter.GamePid)) gameStartUtc=game.StartTime.ToUniversalTime();
             viewReader=new StructuredViewReader(Path.Combine(dataRoot,"work","bridge-state.txt"),log);
         } catch(Exception ex) { Fail(ex); }
     }
-    void Fail(Exception ex) { status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
+    void Fail(Exception ex) { status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
     void Tick() {
         try {
             if(waitingForGame && DateTime.UtcNow>=nextGameCheck) {
@@ -181,7 +174,7 @@ public sealed class HelperWindow : Form {
                     var decision=viewReader.Poll(focused,gameStartUtc,DateTime.UtcNow);
                     if(decision.Stop) narrator.Stop();
                     if(decision.Text!=null) {
-                        narrator.Receive(new Dialogue { Text=decision.Text, Source="engine-visible-state" });
+                        narrator.Receive(new Dialogue { Text=decision.Text, Source="engine-visible-state", RememberForRepeat=decision.IsDialogue });
                         log.Write("structured-narration",decision.Text);
                     }
                 }
@@ -190,7 +183,7 @@ public sealed class HelperWindow : Form {
         } catch(Exception ex) { Fail(ex); }
     }
     protected override void WndProc(ref Message m) {
-        if(m.Msg==0x312 && GameFocused()) { if(m.WParam.ToInt32()==1) { narrator.Repeat(); log.Write("repeat",true); } if(m.WParam.ToInt32()==2) Toggle(); }
+        if(m.Msg==GameShortcuts.Message && GameFocused()) { if(m.WParam.ToInt32()==1) { narrator.Repeat(); log.Write("repeat",true); } if(m.WParam.ToInt32()==2) Toggle(); }
         base.WndProc(ref m);
     }
 }
@@ -201,7 +194,7 @@ public static class Program {
         if(args.Length>0 && args[0]=="--setup") return PortableSetup.Run(root,false);
         if(args.Length>0 && args[0]=="--uninstall") return PortableSetup.Run(root,true);
         if(args.Length>0 && args[0]=="--remove-installed-bridge") return PortableSetup.RemoveInstalled(root);
-        if(args.Length==5 && args[0]=="--setup-worker") return PortableSetup.Worker(root,args);
+        if((args.Length==5 || args.Length==6) && args[0]=="--setup-worker") return PortableSetup.Worker(root,args);
         if(args.Length==3 && args[0]=="--portable-test") return PortableSelfTests.Run(root,args[1],args[2]);
         var dataRoot=PortablePaths.Data(root); Directory.CreateDirectory(dataRoot);
         var startupLog=Path.Combine(dataRoot,"startup-diagnostics.log");

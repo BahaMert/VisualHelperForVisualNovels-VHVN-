@@ -1,4 +1,13 @@
 # Development handoff
+## Latest changes — 0.2.2
+
+- Dialogue now carries RememberForRepeat; only actual fallback dialogue or a semantic passage updates the repeat buffer. Structured hover, menus and backlog speech are transient. ViewDecision.IsDialogue marks passage speech; a new connection clears stale dialogue. Regression covers names/menus between passages, mute and repeat.
+- Removed RegisterHotKey entirely from the reader. GameShortcuts installs a WH_KEYBOARD_LL callback on a dedicated native message-loop thread, checks the actual foreground game PID for each event, and forwards all keys outside it. Only configured game-focused combinations are consumed. No text is recorded/logged. Speech/UI work is posted back to the window, never performed in the callback. ShortcutPolicy covers exact modifiers, held keys, keyup and focus changes. Recording in settings suspends interception. See Microsoft LowLevelKeyboardProc documentation for callback time/foreground/message-loop constraints.
+- Setup identifies known old helper bodies using profiles/legacy-bridges.json: exact normalized SHA256 of all code after a strictly validated vnhOutputPath declaration. Only that old per-PC output path and CRLF/LF differences are normalized; arbitrary code changes are not accepted. The six known body hashes were generated from preserved original bridge versions, including current portable/developer variants; no old private paths/scripts are distributed.
+- Existing recognized bridge replacement requires a spoken, keyboard-accessible confirmation. Approval is the exact original file hash, passed through the elevation worker and rechecked before replacement. Old bridge and prior marker are backed up. Cancel/no approval leaves existing files untouched; unknown/modified unrelated extensions still refused. This supersedes older instructions to manually remove legacy developer bridges.
+- Native full self-tests (repeat policy, structured classification, key focus policy and hook lifecycle), UI smoke and replacement-dialog cancellation passed. Inspected replacement-dialog screenshot. Isolated game-copy migration test passed recognized legacy adoption without metadata, confirmation required, stale approval refused, exact old-file backup, save preservation and unknown/modified protection. No real game input was synthesized and the live installation was not changed by these tests.
+
+Release procedure remains below. Both assembly and VERSION.txt are now0.2.2. Friend/live checks after updating: hover a name then Repeat; Alt-Tab and type assigned keys; use a recognized older installation to check the spoken Replace/Cancel prompt. Existing same-version bridge need not be replaced merely because the reader changed.
 
 ## Current implementation
 

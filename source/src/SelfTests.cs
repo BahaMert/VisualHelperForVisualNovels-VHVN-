@@ -45,7 +45,16 @@ public static class SelfTests {
             controller.SetFocus(true); Check(speech.Calls.Count==count,"no stale auto replay");
             controller.Toggle(); count=speech.Calls.Count; controller.Receive(new Dialogue {Text="Muted"}); controller.Repeat(); Check(speech.Calls.Count==count,"mute");
             controller.Toggle(); controller.Repeat(); Check(speech.Calls[speech.Calls.Count-1]=="speak:Muted","repeat latest");
+            controller.Receive(new Dialogue {Text="Maid",RememberForRepeat=false});
+            Check(speech.Calls[speech.Calls.Count-1]=="speak:Maid","name hover still speaks");
+            controller.Repeat(); Check(speech.Calls[speech.Calls.Count-1]=="speak:Muted","speaker hover never replaces dialogue repeat");
+            controller.Receive(new Dialogue {Text="Settings. Volume",RememberForRepeat=false});
+            controller.Repeat(); Check(speech.Calls[speech.Calls.Count-1]=="speak:Muted","menu labels never replace dialogue repeat");
+            controller.Receive(new Dialogue {Text="New passage"}); controller.Receive(new Dialogue {Text="Michel",RememberForRepeat=false});
+            controller.Repeat(); Check(speech.Calls[speech.Calls.Count-1]=="speak:New passage","repeat follows latest dialogue after another name");
+            controller.ClearDialogue(); count=speech.Calls.Count; controller.Repeat(); Check(speech.Calls.Count==count,"new connection cannot repeat stale dialogue");
             result.Add("PASS: cancellation, repeated passages, focus loss, mute and repeat");
+            ShortcutTests.Run(); result.Add("PASS: shortcuts pass through outside game, exact modifiers, held-key suppression, focus transitions and native hook lifecycle");
             if(fixture!=null) {
                 int selected=0, other=0;
                 foreach(var line in File.ReadLines(fixture)) { if(parser.Parse(line)!=null) selected++; else other++; }
