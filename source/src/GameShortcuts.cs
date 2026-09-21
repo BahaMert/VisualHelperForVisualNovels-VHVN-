@@ -7,21 +7,25 @@ using System.Threading;
 namespace VisualNovelHelper {
 // Pure policy: only configured game-focused keys are consumed. Never stores typed text.
 public sealed class ShortcutPolicy {
-    int repeatKey, repeatModifiers, toggleKey, toggleModifiers;
+    int repeatKey, repeatModifiers, toggleKey, toggleModifiers, skipKey, skipModifiers;
+    public bool SkipHeld { get; private set; }
+    public void ReleaseSkip() { SkipHeld=false; }
     readonly HashSet<int> held=new HashSet<int>();
     readonly HashSet<int> consumed=new HashSet<int>();
-    public void Configure(int rk,int rm,int tk,int tm) {
+    public void Configure(int rk,int rm,int tk,int tm,int sk=0,int sm=0) {
         repeatKey=rk; repeatModifiers=rm; toggleKey=tk; toggleModifiers=tm;
+        skipKey=sk; skipModifiers=sm; SkipHeld=false;
         held.Clear(); consumed.Clear();
     }
     public bool Handle(int key,bool down,int modifiers,bool focused,out int action) {
         action=0;
-        if(key!=repeatKey && key!=toggleKey) return false;
+        if(key!=repeatKey && key!=toggleKey && key!=skipKey) return false;
         bool already=held.Contains(key);
         if(down) held.Add(key); else held.Remove(key);
-        if(!focused) { consumed.Remove(key); return false; }
-        if(!down) return consumed.Remove(key);
+        if(!focused) { SkipHeld=false; consumed.Remove(key); return false; }
+        if(!down) { if(key==skipKey) SkipHeld=false; return consumed.Remove(key); }
         if(already) return consumed.Contains(key);
+        if(key!=0 && key==skipKey && modifiers==skipModifiers) { SkipHeld=true; consumed.Add(key); return true; }
         if(key!=0 && key==repeatKey && modifiers==repeatModifiers) action=1;
         else if(key!=0 && key==toggleKey && modifiers==toggleModifiers) action=2;
         if(action==0) return false;
@@ -55,7 +59,13 @@ public sealed class GameShortcuts : IDisposable {
     Exception startupError;
     public volatile int GamePid;
     public volatile bool Suspended;
+    public bool SkipHeld { get {
+        int mods=(GetAsyncKeyState(18)<0?1:0)|(GetAsyncKeyState(17)<0?2:0)|(GetAsyncKeyState(16)<0?4:0)|((GetAsyncKeyState(91)<0 || GetAsyncKeyState(92)<0)?8:0);
+        lock(policy) { if(Suspended || mods!=skipModifiers) policy.ReleaseSkip(); return policy.SkipHeld; }
+    } }
+    public void ReleaseSkip() { lock(policy) policy.ReleaseSkip(); }
     bool disposed;
+    int skipModifiers;
     public GameShortcuts(IntPtr targetWindow) {
         window=targetWindow;
         thread=new Thread(Run) { IsBackground=true,Name="VHVN game shortcuts" };
@@ -63,7 +73,8 @@ public sealed class GameShortcuts : IDisposable {
         if(startupError!=null) { ready.Dispose(); throw startupError; }
     }
     public void Configure(Preferences settings) {
-        lock(policy) policy.Configure(settings.RepeatKey,settings.RepeatModifiers,settings.ToggleKey,settings.ToggleModifiers);
+        skipModifiers=settings.SkipModifiers;
+        lock(policy) policy.Configure(settings.RepeatKey,settings.RepeatModifiers,settings.ToggleKey,settings.ToggleModifiers,settings.RemapSkip?settings.SkipKey:0,settings.SkipModifiers);
     }
     void Run() {
         try {

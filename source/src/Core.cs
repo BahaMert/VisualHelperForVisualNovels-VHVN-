@@ -13,6 +13,8 @@ public sealed class Preferences {
     public int Rate = 0;
     public int Volume = 85;
     public bool ReadControls = true;
+    public bool RemapSkip = true, ReadOpening = true;
+    public int SkipKey = 20, SkipModifiers = 0; // Hold Caps Lock; no toggle state is changed.
     public int RepeatKey = 0, RepeatModifiers = 0, ToggleKey = 0, ToggleModifiers = 0;
 }
 public sealed class Log : IDisposable {

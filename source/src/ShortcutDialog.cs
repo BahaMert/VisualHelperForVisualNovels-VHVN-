@@ -16,7 +16,7 @@ public sealed class ShortcutDialog : Form {
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); layout.RowStyles.Add(new RowStyle(SizeType.Percent,100)); layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(new Label {Text="Type a shortcut, choose one, or press Record keys.\nExamples: F9 or Alt+R. Tab moves between controls.",AutoSize=true,Dock=DockStyle.Fill},0,0);
         entry.DropDownStyle=ComboBoxStyle.DropDown; entry.Dock=DockStyle.Fill; entry.AccessibleName="Shortcut, type a key combination";
-        entry.Items.Add("Unassigned"); for(int i=1;i<=24;i++) entry.Items.Add("F"+i);
+        entry.Items.Add("Unassigned"); entry.Items.Add("CapsLock"); for(int i=1;i<=24;i++) entry.Items.Add("F"+i);
         for(char c='A';c<='Z';c++) entry.Items.Add(c.ToString());
         for(int i=0;i<=9;i++) entry.Items.Add("NumPad"+i);
         entry.Text=Describe(key,modifiers); layout.Controls.Add(entry,0,1);
@@ -79,11 +79,11 @@ public sealed class ShortcutDialog : Form {
             else if(!Enum.TryParse<Keys>(token,true,out parsed)) return false;
             int code=(int)parsed;
             bool supported=(code>=(int)Keys.A && code<=(int)Keys.Z)||(code>=(int)Keys.D0 && code<=(int)Keys.D9)||(code>=(int)Keys.F1 && code<=(int)Keys.F24)||(code>=(int)Keys.NumPad0 && code<=(int)Keys.Divide)||parsed==Keys.Home||parsed==Keys.End||parsed==Keys.PageUp||parsed==Keys.PageDown||parsed==Keys.Insert||parsed==Keys.Delete||parsed==Keys.Pause||parsed==Keys.Scroll||parsed==Keys.Space;
-            if(!supported) return false; key=code;
+            if(!supported && parsed!=Keys.CapsLock) return false; key=code;
         }
         if(key==0) { error="Include a main key, for example Alt+F9. A modifier alone cannot be assigned."; return false; }
         error=null; return true;
     }
-    public static string Describe(int key,int modifiers) { if(key==0) return "Unassigned"; return ((modifiers&1)!=0?"Alt+":"")+((modifiers&2)!=0?"Ctrl+":"")+((modifiers&4)!=0?"Shift+":"")+((Keys)key).ToString(); }
+    public static string Describe(int key,int modifiers) { if(key==0) return "Unassigned"; return ((modifiers&1)!=0?"Alt+":"")+((modifiers&2)!=0?"Ctrl+":"")+((modifiers&4)!=0?"Shift+":"")+(key==20?"CapsLock":((Keys)key).ToString()); }
 }
 }

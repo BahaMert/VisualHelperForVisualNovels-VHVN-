@@ -21,6 +21,19 @@ public static class ShortcutTests {
         p.Handle(82,false,8,true,out action);
         p.Configure(0,0,0,0);
         Check(!p.Handle(82,true,0,true,out action),"unassigned passes through");
+        p.Configure(82,0,84,0,20,0);
+        Check(p.Handle(20,true,0,true,out action) && p.SkipHeld && action==0,"Caps Lock held without changing toggle state");
+        Check(p.Handle(20,true,0,true,out action) && p.SkipHeld,"skip autorepeat remains held");
+        Check(p.Handle(20,false,0,true,out action) && !p.SkipHeld,"release stops skip");
+        Check(!p.Handle(17,true,0,true,out action) && !p.Handle(18,true,2,true,out action),"Ctrl and Alt never consumed by skip");
+        Check(!p.Handle(20,true,0,false,out action) && !p.SkipHeld,"Caps Lock outside game passes through");
+        Check(!p.Handle(20,true,0,true,out action) && !p.SkipHeld,"outside-held key cannot start skipping on focus return");
+        p.Handle(20,false,0,true,out action);
+        p.Configure(82,0,84,0,120,4);
+        Check(!p.Handle(120,true,0,true,out action),"configured skip modifier required"); p.Handle(120,false,0,true,out action);
+        Check(p.Handle(120,true,4,true,out action) && p.SkipHeld,"custom skip combo");
+        p.ReleaseSkip(); Check(!p.SkipHeld,"focus loss releases hold without another keyboard event");
+        p.Configure(82,0,84,0); Check(!p.Handle(20,true,0,true,out action),"disabling remap restores normal Caps Lock");
         // Exercise creation and clean shutdown of the actual native message-loop thread.
         using(var native=new GameShortcuts(IntPtr.Zero)) { native.Configure(new Preferences {RepeatKey=82}); }
     }

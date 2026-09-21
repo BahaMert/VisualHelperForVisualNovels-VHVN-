@@ -29,7 +29,9 @@ public sealed class HelperWindow : Form {
     readonly ComboBox voices=new ComboBox();
     readonly NumericUpDown rate=new NumericUpDown(), volume=new NumericUpDown();
     readonly Button toggle=new Button();
-    readonly Button repeatBinding=new Button(), toggleBinding=new Button();
+    readonly Button repeatBinding=new Button(), toggleBinding=new Button(), skipBinding=new Button();
+    readonly GameInputChannel gameInput;
+    OpeningReader openingReader;
     readonly NotifyIcon tray=new NotifyIcon();
     readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer();
     TextractorAdapter adapter;
@@ -41,6 +43,7 @@ public sealed class HelperWindow : Form {
     public HelperWindow(string projectRoot, bool uiSmoke=false) {
         root=projectRoot;
         dataRoot=PortablePaths.Data(root);
+        gameInput=new GameInputChannel(Path.Combine(dataRoot,"work","bridge-state.txt"));
         Directory.CreateDirectory(Path.Combine(dataRoot,"logs"));
         Directory.CreateDirectory(Path.Combine(dataRoot,"work"));
         log=new Log(Path.Combine(dataRoot,"logs","helper-"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".jsonl"));
@@ -52,7 +55,7 @@ public sealed class HelperWindow : Form {
         try { preferences=File.Exists(prefPath)?json.Deserialize<Preferences>(File.ReadAllText(prefPath)):new Preferences(); }
         catch { preferences=new Preferences(); }
         narrator=new NarrationController(speech);
-        Text="VHVN — Visual Helper for Visual Novels"; Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath); ClientSize=new Size(640,540); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
+        Text="VHVN — Visual Helper for Visual Novels"; Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath); ClientSize=new Size(640,675); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
         Font=new Font("Segoe UI",12); StartPosition=FormStartPosition.CenterScreen;
         var heading=new Label { Text="Fata Morgana read-aloud", Font=new Font(Font.FontFamily,16,FontStyle.Bold), AutoSize=true, Location=new Point(20,16) };
         Controls.Add(heading);
@@ -74,11 +77,16 @@ public sealed class HelperWindow : Form {
         AddButton("Repeat",170,220,135,delegate { narrator.Repeat(); });
         toggle.Text="Speech: on"; toggle.SetBounds(320,220,140,38); toggle.Click+=delegate { Toggle(); }; Controls.Add(toggle);
         AddButton("Exit helper",475,220,135,delegate { Close(); });
-        repeatBinding.SetBounds(20,273,290,38); repeatBinding.Click+=delegate { ConfigureShortcut(true); }; Controls.Add(repeatBinding);
-        toggleBinding.SetBounds(320,273,290,38); toggleBinding.Click+=delegate { ConfigureShortcut(false); }; Controls.Add(toggleBinding); UpdateShortcutLabels();
-        current.SetBounds(20,325,600,60); current.Text="Shortcuts are optional. Choose keys unused by your game.\nMinimize this window to keep playing."; Controls.Add(current);
-        Controls.Add(new Label { Text="Advance normally. Hover choices, controls, backlog lines or a speaker's printed name to hear them.", Location=new Point(20,400), Size=new Size(600,55) });
-        var readControls=new CheckBox {Text="Read helper controls aloud",AccessibleName="Read helper controls aloud",Checked=preferences.ReadControls,Location=new Point(20,470),Size=new Size(590,40)};
+        repeatBinding.SetBounds(20,273,290,38); repeatBinding.Click+=delegate { ConfigureShortcut(0); }; Controls.Add(repeatBinding);
+        toggleBinding.SetBounds(320,273,290,38); toggleBinding.Click+=delegate { ConfigureShortcut(1); }; Controls.Add(toggleBinding);
+        skipBinding.SetBounds(20,320,590,38); skipBinding.Click+=delegate { ConfigureShortcut(2); }; Controls.Add(skipBinding); UpdateShortcutLabels();
+        var remap=new CheckBox {Text="Free Ctrl for Magnifier; use the hold-to-skip key",AccessibleName="Free Ctrl for Magnifier",Checked=preferences.RemapSkip,Location=new Point(20,365),Size=new Size(595,38)};
+        remap.CheckedChanged+=delegate { preferences.RemapSkip=remap.Checked; if(shortcuts!=null) shortcuts.Configure(preferences); SaveSettings(); }; Controls.Add(remap);
+        current.SetBounds(20,411,600,55); current.Text="Hold the skip key to fast-forward; release it to stop.\nKeys work normally outside the game."; Controls.Add(current);
+        Controls.Add(new Label { Text="Advance normally. Hover choices, controls, backlog lines or a speaker's printed name to hear them.", Location=new Point(20,479), Size=new Size(600,55) });
+        var opening=new CheckBox {Text="Read opening image cards (Windows OCR)",AccessibleName="Read opening image cards",Checked=preferences.ReadOpening,Location=new Point(20,543),Size=new Size(590,40)};
+        opening.CheckedChanged+=delegate {preferences.ReadOpening=opening.Checked; SaveSettings();}; Controls.Add(opening);
+        var readControls=new CheckBox {Text="Read helper controls aloud",AccessibleName="Read helper controls aloud",Checked=preferences.ReadControls,Location=new Point(20,591),Size=new Size(590,40)};
         readControls.CheckedChanged+=delegate { preferences.ReadControls=readControls.Checked; SaveSettings(); if(preferences.ReadControls) SpeakControl("Helper control reading on."); }; Controls.Add(readControls);
         tray.Icon=Icon; tray.Text="VHVN"; tray.Visible=true;
         var menu=new ContextMenuStrip(); menu.Items.Add("Settings",null,delegate { Show(); WindowState=FormWindowState.Normal; Activate(); }); menu.Items.Add("Exit",null,delegate { Close(); }); tray.ContextMenuStrip=menu;
@@ -108,29 +116,32 @@ public sealed class HelperWindow : Form {
             catch(Exception ex) { log.Write("shortcut-error",ex.Message); MessageBox.Show(this,"Game shortcuts could not be enabled. The Repeat and Speech buttons still work."); }
             Connect();
         };
-        FormClosed+=delegate { timer.Stop(); if(shortcuts!=null) shortcuts.Dispose(); narrator.Stop(); if(adapter!=null) adapter.Dispose(); tray.Dispose(); speech.Dispose(); log.Write("closed",true); log.Dispose(); };
+        FormClosed+=delegate { timer.Stop(); ReleaseGameInput(); if(shortcuts!=null) shortcuts.Dispose(); narrator.Stop(); if(adapter!=null) adapter.Dispose(); tray.Dispose(); speech.Dispose(); log.Write("closed",true); log.Dispose(); };
     }
     void AddButton(string label,int x,int y,int width,Action action) { var button=new Button { Text=label, Location=new Point(x,y), Size=new Size(width,38) }; button.Click+=delegate { action(); }; Controls.Add(button); }
     void SpeakControl(string text) { speech.Stop(); speech.Speak(text); }
     void UpdateShortcutLabels() {
         repeatBinding.Text="Repeat key: "+ShortcutDialog.Describe(preferences.RepeatKey,preferences.RepeatModifiers);
         toggleBinding.Text="Toggle key: "+ShortcutDialog.Describe(preferences.ToggleKey,preferences.ToggleModifiers);
+        skipBinding.Text="Hold-to-skip key: "+ShortcutDialog.Describe(preferences.SkipKey,preferences.SkipModifiers);
+        skipBinding.AccessibleName=skipBinding.Text;
         repeatBinding.AccessibleName=repeatBinding.Text; toggleBinding.AccessibleName=toggleBinding.Text;
     }
-    void ConfigureShortcut(bool repeat) {
-        int key=repeat?preferences.RepeatKey:preferences.ToggleKey, modifiers=repeat?preferences.RepeatModifiers:preferences.ToggleModifiers;
-        using(var dialog=new ShortcutDialog(repeat?"Repeat":"Toggle speech",key,modifiers,preferences.ReadControls?(Action<string>)SpeakControl:null)) {
+    void ConfigureShortcut(int action) {
+        int key=action==0?preferences.RepeatKey:action==1?preferences.ToggleKey:preferences.SkipKey, modifiers=action==0?preferences.RepeatModifiers:action==1?preferences.ToggleModifiers:preferences.SkipModifiers;
+        using(var dialog=new ShortcutDialog(action==0?"Repeat":action==1?"Toggle speech":"Hold to skip",key,modifiers,preferences.ReadControls?(Action<string>)SpeakControl:null)) {
             DialogResult outcome;
             if(shortcuts!=null) shortcuts.Suspended=true;
             try { outcome=dialog.ShowDialog(this); }
             finally { if(shortcuts!=null) shortcuts.Suspended=false; }
             if(outcome!=DialogResult.OK) return;
-            int otherKey=repeat?preferences.ToggleKey:preferences.RepeatKey, otherModifiers=repeat?preferences.ToggleModifiers:preferences.RepeatModifiers;
-            if(dialog.SelectedKey!=0 && dialog.SelectedKey==otherKey && dialog.SelectedModifiers==otherModifiers) { MessageBox.Show(this,"Choose a different shortcut for each action."); return; }
-            if(repeat) { preferences.RepeatKey=dialog.SelectedKey; preferences.RepeatModifiers=dialog.SelectedModifiers; }
-            else { preferences.ToggleKey=dialog.SelectedKey; preferences.ToggleModifiers=dialog.SelectedModifiers; }
+            int[] keys={preferences.RepeatKey,preferences.ToggleKey,preferences.SkipKey}, mods={preferences.RepeatModifiers,preferences.ToggleModifiers,preferences.SkipModifiers};
+            for(int i=0;i<3;i++) if(i!=action && dialog.SelectedKey!=0 && dialog.SelectedKey==keys[i] && dialog.SelectedModifiers==mods[i]) { MessageBox.Show(this,"Choose a different shortcut for each action."); return; }
+            if(action==0) { preferences.RepeatKey=dialog.SelectedKey; preferences.RepeatModifiers=dialog.SelectedModifiers; }
+            else if(action==1) { preferences.ToggleKey=dialog.SelectedKey; preferences.ToggleModifiers=dialog.SelectedModifiers; }
+            else { preferences.SkipKey=dialog.SelectedKey; preferences.SkipModifiers=dialog.SelectedModifiers; }
             if(shortcuts!=null) shortcuts.Configure(preferences);
-            UpdateShortcutLabels(); SaveSettings(); log.Write("shortcut-changed",new { action=repeat?"repeat":"toggle",key=dialog.SelectedKey,modifiers=dialog.SelectedModifiers });
+            UpdateShortcutLabels(); SaveSettings(); log.Write("shortcut-changed",new { action=action,key=dialog.SelectedKey,modifiers=dialog.SelectedModifiers });
         }
     }
     void SaveSettings() {
@@ -141,9 +152,10 @@ public sealed class HelperWindow : Form {
     }
     void Toggle() { narrator.Toggle(); toggle.Text=narrator.Enabled?"Speech: on":"Speech: off"; toggle.AccessibleName=toggle.Text; log.Write("speech-enabled",narrator.Enabled); }
     bool GameFocused() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(),out pid); return adapter!=null && pid==adapter.GamePid; }
+    void ReleaseGameInput() { try { gameInput.Publish(viewReader==null?null:viewReader.Session,false,0,false,DateTime.UtcNow); } catch(Exception ex) {log.Write("input-release-error",ex.Message);} }
     void Connect() {
         try {
-            narrator.Stop(); narrator.ClearDialogue(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) adapter.Dispose();
+            ReleaseGameInput(); narrator.Stop(); narrator.ClearDialogue(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) adapter.Dispose();
             adapter=null; viewReader=null; waitingForGame=false;
             if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length==0) {
                 waitingForGame=true; status.Text="Ready. Start Fata Morgana through Steam. I will connect automatically."; return;
@@ -159,9 +171,10 @@ public sealed class HelperWindow : Form {
             if(shortcuts!=null) shortcuts.GamePid=adapter.GamePid;
             using(var game=System.Diagnostics.Process.GetProcessById(adapter.GamePid)) gameStartUtc=game.StartTime.ToUniversalTime();
             viewReader=new StructuredViewReader(Path.Combine(dataRoot,"work","bridge-state.txt"),log);
+            openingReader=new OpeningReader(slot=>System.Threading.Tasks.Task.Run(()=>OpeningReader.Recognize(Path.Combine(dataRoot,"work","bridge-state.txt"),slot)));
         } catch(Exception ex) { Fail(ex); }
     }
-    void Fail(Exception ex) { status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
+    void Fail(Exception ex) { ReleaseGameInput(); status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
     void Tick() {
         try {
             if(waitingForGame && DateTime.UtcNow>=nextGameCheck) {
@@ -169,15 +182,20 @@ public sealed class HelperWindow : Form {
                 if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length>0) Connect();
             }
             bool focused=GameFocused(); narrator.SetFocus(focused);
+            if(!focused && shortcuts!=null) shortcuts.ReleaseSkip();
             if(adapter!=null) {
                 if(viewReader!=null) {
                     var decision=viewReader.Poll(focused,gameStartUtc,DateTime.UtcNow);
                     adapter.ObserveBridge(viewReader.HasLiveState,DateTime.UtcNow);
-                    if(decision.Stop) narrator.Stop();
+                    gameInput.Publish(viewReader.Session,preferences.RemapSkip && shortcuts!=null,preferences.SkipKey,focused && shortcuts!=null && shortcuts.SkipHeld,DateTime.UtcNow);
+                    if(decision.Stop && decision.Text==null) narrator.Stop();
                     if(decision.Text!=null) {
                         narrator.Receive(new Dialogue { Text=decision.Text, Source="engine-visible-state", RememberForRepeat=decision.IsDialogue });
                         log.Write("structured-narration",decision.Text);
                     }
+                    string openingText=openingReader.Update(decision.ImageIdentity,decision.ImageSlot,focused && narrator.Enabled && preferences.ReadOpening);
+                    if(!String.IsNullOrWhiteSpace(openingText)) {narrator.Receive(new Dialogue {Text=openingText,Source="opening-ocr"});log.Write("opening-narration",openingText);}
+                    if(openingReader.Error!=null) {status.Text=openingReader.Error;log.Write("opening-error",openingReader.Error);}
                 }
                 adapter.Poll();
             }

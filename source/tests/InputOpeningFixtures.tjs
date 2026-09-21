@@ -1,0 +1,65 @@
+// Synthetic objects only. Invoked by the local native-engine harness.
+var inputGame=%[skipMode:0,historyShowing:false,starts:0,stops:0];
+var originalKeys=[17];
+global.CtrlSkip_obj=%[enabled:true,keyary:originalKeys];
+CtrlSkip_obj.isSkipKey=function(key) { return key==17; };
+CtrlSkip_obj.isSkipKeyPushed=function(key) { return key===void || key==17; };
+inputGame.checkProceedingKey=function(key,shift) {if(global.CtrlSkip_obj.isSkipKey(key)) {this.starts++;this.skipMode=4;}} incontextof inputGame;
+inputGame.cancelSkip=function() {this.stops++;this.skipMode=0;} incontextof inputGame;
+var input=new VNHFataInput(inputGame,System.exePath+"input-fixture","123-456");
+function inputFrame(sequence,remap,held,key=20,session="123-456") {
+    ["VNHI1",sequence,session,remap,key,held,"END\t"+sequence].save(System.exePath+"input-fixture.input");
+    input.tick();
+}
+inputFrame(1,1,0);
+check(!input.active() && CtrlSkip_obj.isSkipKey(17),"stale initial input file cannot change Ctrl");
+inputFrame(2,1,0);
+check(input.active() && !CtrlSkip_obj.isSkipKey(17),"live remap frees Ctrl inside game");
+inputFrame(3,1,1);
+check(inputGame.starts==1 && inputGame.skipMode==4 && CtrlSkip_obj.isSkipKeyPushed(),"hold starts native skip");
+inputFrame(4,1,1); check(inputGame.starts==1,"heartbeats do not restart skip");
+inputFrame(5,1,0); check(inputGame.stops==1 && inputGame.skipMode==0,"release ends skip");
+inputFrame(6,0,0); check(CtrlSkip_obj.isSkipKey(17),"user can restore Ctrl skip");
+inputFrame(7,1,1,120); check(inputGame.starts==2 && CtrlSkip_obj.isSkipKey(120),"configurable key");
+input.lastChange=System.getTickCount()-1600; input.tick();
+check(!input.active() && inputGame.stops==2 && CtrlSkip_obj.isSkipKey(17),"helper crash expires lease and stops held skip");
+check(CtrlSkip_obj.keyary===originalKeys && originalKeys.count==1 && originalKeys[0]==17,"saved plugin keys remain untouched");
+inputFrame(8,1,1,20,"wrong-session"); check(!input.active(),"other game session cannot control skip");
+delete global.CtrlSkip_obj;
+
+class FakeCard {
+    var exports=0, lastPath="";
+    function saveLayerImage(path,format) {exports++; lastPath=path; check(format=="bmp32","OCR export format");}
+}
+var card=new FakeCard();
+var openingGame=%[tagHandlers:%[],conductor:%[curStorage:"scenario.ks"]];
+openingGame.tagHandlers.image=function(elm) {return 117;};
+openingGame.tagHandlers.trans=function(elm) {return 118;};
+openingGame.getLayerFromElm=function(elm) {return global.card;};
+var opening=new VNHFataOpening(openingGame,System.exePath+"opening-fixture");
+check(openingGame.tagHandlers.image(%[storage:"op_1",page:"back",visible:"true"])==117,"original image handler return");
+check(card.exports==1 && !opening.active,"prepare image before transition, do not announce unseen card");
+check(openingGame.tagHandlers.trans(%[])==118 && opening.isCurrent(),"transition activates prepared opening card");
+var openingSerial=opening.serial;
+openingGame.tagHandlers.image(%[storage:"op_1",page:"fore"]);
+check(card.exports==1 && opening.serial==openingSerial,"fore copies do not repeat card");
+openingGame.tagHandlers.image(%[storage:"op_1",page:"back",visible:"false"]); openingGame.tagHandlers.trans(%[]);
+check(!opening.active && card.exports==1,"fade-out does not re-read hidden card");
+openingGame.tagHandlers.image(%[storage:"op_2",page:"back",visible:"true"]); openingGame.tagHandlers.trans(%[]);
+check(opening.serial!=openingSerial && card.exports==2,"next card has a new identity");
+openingGame.tagHandlers.image(%[storage:"op_7",page:"back",visible:"true"]); openingGame.tagHandlers.trans(%[]);
+openingSerial=opening.serial;
+openingGame.tagHandlers.image(%[storage:"op_8",page:"back",visible:"true"]); openingGame.tagHandlers.trans(%[]);
+check(opening.serial==openingSerial && card.exports==3 && opening.current=="op_7","blur animation preserves original sharp-card speech without repeats");
+openingGame.conductor.curStorage="title.ks";
+check(!opening.isCurrent(),"leaving opening invalidates its state");
+openingGame.tagHandlers.image(%[storage:"op_1",page:"back",visible:"true"]);
+check(card.exports==3,"matching filename outside opening is ignored");
+
+// Preview a known pause macro without advancing/evaluating the actual scenario.
+var previewGame=%[conductor:%[curLineStr:"Sample [w]sentence.[p]Do not read future",curPos:1,tag_stack:[]],skipMode:0];
+previewGame.mainConductor=previewGame.conductor;
+var previewSource=new VNHFataDialogue(previewGame);
+check(previewSource.previewLine("S")=="Sample sentence.","pause macro no longer forces whole-line rendering wait");
+previewGame.conductor.curLineStr="Sample [eval exp=unsafe]sentence.[p]";
+check(previewSource.previewLine("S")=="","expressions still refuse speculative preview");

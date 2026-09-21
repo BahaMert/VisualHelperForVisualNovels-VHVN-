@@ -1,5 +1,5 @@
 #ifndef ReleaseVersion
-  #define ReleaseVersion "0.2.3"
+  #define ReleaseVersion "0.2.4"
 #endif
 #ifndef ReleaseOutput
   #define ReleaseOutput "..\artifacts"

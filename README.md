@@ -60,6 +60,18 @@ Select **Save** to apply it or **Unassign** to remove it. Escape cancels key rec
 
 The helper uses larger native controls with accessible names and keyboard navigation. Use Tab and Shift+Tab to move between controls. **Read helper controls aloud** provides speech when controls receive focus or are hovered; turn it off if you prefer your own screen reader. Compatibility with every assistive-tool configuration is not yet verified.
 
+### Skip and Magnifier
+
+**Free Ctrl for Magnifier** is enabled by default. Hold **Caps Lock** to skip and release it to stop. Caps Lock does not toggle capitalization while it is the active game skip key. Choose **Hold-to-skip key** to type, select or record a different key; **Unassigned** disables the replacement key while keeping Ctrl free.
+
+If you prefer the game's normal **Ctrl-to-skip**, turn **Free Ctrl for Magnifier** off. This choice is saved. Ctrl and Alt continue to reach Windows/Magnifier, and keys behave normally outside the game. Remapping applies while VHVN is running, including when speech is muted; closing VHVN restores the original game behavior. The game integration must be updated and the game restarted for this feature.
+
+### Earlier dialogue and the opening
+
+Supported dialogue starts reading as soon as the game provides a safely bounded passage; visual character animation and the known pause macro do not need to finish first. Scene transitions, unsupported script commands and the selected Windows voice can still introduce latency.
+
+**Read opening image cards (Windows OCR)** reads text embedded in the scripted opening's images at their transitions. It uses local Windows OCR on the game's card layer, not desktop screenshots or a remote service. Disable this option if you prefer the opening without narration. An installed Windows OCR language is required. OCR may make mistakes with unusual lettering; this feature is specific to this opening, not arbitrary movie files. Late recognition results are discarded when the scene changes or the game loses focus.
+
 ## Updating and removing
 
 Download and run the latest installer to update VHVN. Close the helper before updating. On the next launch, it checks whether the game's integration also needs updating.

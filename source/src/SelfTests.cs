@@ -15,11 +15,16 @@ public static class SelfTests {
         var result=new List<string>();
         try {
             ViewSelfTests.Run(root);
+            OpeningTests.Run();
+            result.Add("PASS: opening OCR latest-scene selection, deduplication, focus-loss cancellation and disabled setting");
             result.Add("PASS: structured transport, TJS checksum, malformed/stale state rejection, source priority, hover dwell, view transitions and focus");
             var json=new JavaScriptSerializer();
             var profile=json.Deserialize<GameProfile>(File.ReadAllText(Path.Combine(root,"profiles","fata.json")));
             var prefs=json.Deserialize<Preferences>("{\"Voice\":\"\",\"Rate\":0,\"Volume\":85}");
             Check(prefs.RepeatKey==0 && prefs.ToggleKey==0,"old preferences migrate to unassigned keys");
+            Check(prefs.RemapSkip && prefs.SkipKey==20 && prefs.ReadOpening,"old preferences receive accessible skip and opening defaults");
+            int parsedKey,parsedModifiers; string parseError;
+            Check(ShortcutDialog.TryParse("CapsLock",out parsedKey,out parsedModifiers,out parseError) && parsedKey==20,"Caps Lock can be typed");
             prefs.RepeatKey=119; prefs.RepeatModifiers=0;
             var restored=json.Deserialize<Preferences>(json.Serialize(prefs));
             Check(restored.RepeatKey==119 && restored.RepeatModifiers==0,"shortcut settings persisted");

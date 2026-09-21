@@ -102,6 +102,12 @@ public static class ViewSelfTests {
         Check(!ShortcutDialog.TryParse("Alt+R+T",out hotkey,out mods,out error),"multiple main keys rejected");
         Check(!ShortcutDialog.TryParse("Ctrl+Ctrl+F9",out hotkey,out mods,out error),"duplicate modifiers rejected");
         Check(ShortcutDialog.TryParse("Unassigned",out hotkey,out mods,out error) && hotkey==0,"typed unassign");
+        var opening=ViewProtocol.Parse(Frame("mode\topening\nitem\to:1\t0\nfocus\t"));
+        Check(opening!=null,"opening frame accepted");
+        Check(ViewProtocol.Parse(Frame("mode\topening\nitem\to:1\t../../file\nfocus\t"))==null,"opening cannot request arbitrary files");
+        p=new ViewNarration(); var card=p.Update(opening,true,now);
+        Check(card.Stop && card.ImageSlot=="0" && card.ImageIdentity!=null && card.Text==null,"opening routes to image reader, never speaks a filename");
+        Check(!p.Update(opening,true,now.AddMilliseconds(20)).Stop,"same opening card does not continually cancel speech");
         // File reader cannot replay a prior game's snapshot and expires stopped heartbeats.
         var path=Path.Combine(root,"tests","view-reader-fixture.txt");
         File.WriteAllText(path,frame,Encoding.Unicode); File.SetLastWriteTimeUtc(path,now);

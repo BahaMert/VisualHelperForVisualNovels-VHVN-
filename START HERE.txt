@@ -9,6 +9,10 @@ After setup, just open VHVN alongside the game. No command files or developer to
 
 Repeat rereads the latest dialogue passage, never a speaker name or menu label. Shortcuts act only in the focused game; those keys type normally in other apps.
 
+Free Ctrl for Magnifier is on by default: hold Caps Lock to skip and release it to stop. Change Hold-to-skip key to choose another binding. Turn Free Ctrl for Magnifier off to use the game's original Ctrl skip. Keys behave normally outside the game. Remapping stays on when speech is muted, and ends when the helper closes.
+
+Read opening image cards uses local Windows OCR for the scripted opening. This optional setting can be disabled. OCR can make mistakes and requires an installed OCR language. Voice startup and scene transitions can still cause some speech delay.
+
 Click to advance normally. Hover supported choices, menu items and backlog entries to hear them. Hover the printed speaker name briefly to hear it on demand; names are not automatically added to dialogue.
 
 Voice, speed, volume and optional shortcuts are in the helper. Type a shortcut, select it or use Record keys. Save applies; Unassign clears. Tab and Shift+Tab navigate controls. Read helper controls aloud can be turned off if you prefer your own screen reader.

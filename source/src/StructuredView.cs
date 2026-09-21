@@ -50,7 +50,8 @@ public static class ViewProtocol {
                     view.Items.Add(new ViewItem {Id=fields[1],Text=Decode(fields[2])});
                 else return null;
             }
-            if(view.Mode!="dialogue" && view.Mode!="links" && view.Mode!="history" && view.Mode!="controls" && view.Mode!="passage" && view.Mode!="dialog") return null;
+            if(view.Mode!="dialogue" && view.Mode!="links" && view.Mode!="history" && view.Mode!="controls" && view.Mode!="passage" && view.Mode!="dialog" && view.Mode!="opening") return null;
+            if(view.Mode=="opening" && (view.Items.Count!=1 || !Regex.IsMatch(view.Items[0].Id,@"^o:\d+$") || (view.Items[0].Text!="0" && view.Items[0].Text!="1"))) return null;
             if(view.Mode=="passage") {
                 if(view.Items.Count!=1 || !Regex.IsMatch(view.Items[0].Id,@"^p:\d+$") || (view.Phase!="building" && view.Phase!="ready")) return null;
                 if(view.Phase=="building" && view.Items[0].Text!="") return null;
@@ -61,10 +62,10 @@ public static class ViewProtocol {
         } catch(FormatException) { return null; }
     }
 }
-public sealed class ViewDecision { public bool Stop, IsDialogue; public string Text; }
+public sealed class ViewDecision { public bool Stop, IsDialogue; public string Text, ImageIdentity, ImageSlot; }
 public sealed class ViewNarration {
     string session, layout, selection, pending, spoken, mode, title;
-    string lastPassage, lastBuilding;
+    string lastPassage, lastBuilding, lastOpening;
     DateTime since;
     bool focused, owns, pendingHover;
     string hoverId, hoverText; DateTime hoverSince;
@@ -94,6 +95,12 @@ public sealed class ViewNarration {
         owns=active; focused=gameFocused;
         if(!active) { session=layout=selection=pending=spoken=mode=null; return d; }
         session=view.Session; mode=view.Mode; title=view.Title;
+        if(mode=="opening") {
+            pending=null; layout=null; selection=null;
+            d.ImageIdentity=session+"|"+view.Items[0].Id; d.ImageSlot=view.Items[0].Text;
+            if(d.ImageIdentity!=lastOpening) {d.Stop=true;lastOpening=d.ImageIdentity;}
+            return d;
+        }
         if(mode=="passage") {
             pending=null; layout=null; selection=null;
             string identity=session+"|"+view.Items[0].Id;
@@ -144,10 +151,11 @@ public sealed class StructuredViewReader {
     string lastSession; long lastSequence;
     public bool OwnsNarration { get { return policy.OwnsNarration; } }
     public bool HasLiveState { get { return current!=null; } }
+    public string Session { get { return current==null?null:current.Session; } }
     public StructuredViewReader(string path,Log logger) { file=path; log=logger; }
     public ViewDecision Poll(bool focused, DateTime processStartUtc, DateTime now) {
         if(now>=nextRead) {
-            nextRead=now.AddMilliseconds(40);
+            nextRead=now.AddMilliseconds(20);
             try {
                 var info=new FileInfo(file);
                 if(info.Exists && info.Length<=262144 && info.LastWriteTimeUtc>=processStartUtc && (now-info.LastWriteTimeUtc).TotalSeconds<3) {
