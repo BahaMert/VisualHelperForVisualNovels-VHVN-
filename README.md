@@ -60,6 +60,19 @@ Select **Save** to apply it or **Unassign** to remove it. Escape cancels key rec
 
 The helper uses larger native controls with accessible names and keyboard navigation. Use Tab and Shift+Tab to move between controls. **Read helper controls aloud** provides speech when controls receive focus or are hovered; turn it off if you prefer your own screen reader. Compatibility with every assistive-tool configuration is not yet verified.
 
+### Windows natural voices
+
+VHVN supports compatible natural voices exposed through Windows SAPI. Open **Natural voices / setup** in the helper for instructions. Use **Refresh voices**, select the desired voice, then **Test voice**. Voice choices are saved by token ID; older name-only preferences are migrated. If a saved voice is missing, the helper uses an available voice temporarily and retains the saved choice until you select a replacement.
+
+Aria appearing in Magnifier or Narrator does not mean other speech applications can access it. To use an offline natural voice in VHVN and other SAPI applications:
+
+1. Download [NaturalVoiceSAPIAdapter](https://github.com/gexgd0419/NaturalVoiceSAPIAdapter) and extract it to a permanent folder. It is an optional third-party component, not included in VHVN.
+2. Follow the adapter's [compatible voice package instructions](https://github.com/gexgd0419/NaturalVoiceSAPIAdapter/wiki/Narrator-natural-voice-download-links). Its current guidance requires an older package extracted into a separate voice folder; newer Store packages are incompatible. Keep your existing Magnifier/Narrator voice installed. Set the adapter's **Local voice path** to the extracted voice folder, or use its default `NarratorVoices` folder beside `Installer.exe`.
+3. Run the adapter's `Installer.exe` and install its **64-bit** component for VHVN. Install **32-bit** as well for other 32-bit SAPI apps. Registration requires administrator permission. This makes the voice available to compatible SAPI apps; it does not add it to every application's private speech engine.
+4. Disable **Microsoft Edge online voices** and **Azure online voices** in the adapter for offline reading. Close its settings and refresh voices in VHVN. The adapter briefly caches discovery results; restart VHVN if a newly installed voice does not appear.
+
+Validated locally with NaturalVoiceSAPIAdapter 0.2.9 and the Microsoft-signed Aria 2 package version 1.0.1.0, alongside the newer 1.0.2.0 Magnifier package. This is third-party compatibility support and may change with future Windows or adapter updates. Use the adapter's installer to uninstall its components before moving or deleting its files. VHVN's installer/uninstaller does not manage the optional adapter or voice models.
+
 ### Skip and Magnifier
 
 **Free Ctrl for Magnifier** is enabled by default. Hold **Caps Lock** to skip and release it to stop. Caps Lock does not toggle capitalization while it is the active game skip key. Choose **Hold-to-skip key** to type, select or record a different key; **Unassigned** disables the replacement key while keeping Ctrl free.
@@ -102,11 +115,11 @@ This is a preview, not a claim of complete game accessibility. The application a
 
 ## Privacy
 
-Speech uses installed Windows voices; the helper does not send game text to a cloud speech service. Local logs may contain dialogue and spoilers. Share only relevant, reviewed excerpts when reporting a problem. This repository contains no game assets, saves, personal preferences, or play-session logs.
+Speech is passed to the selected Windows SAPI voice. Desktop voices and local natural voice models work offline. Third-party adapters can also expose online voices, which send the spoken text to their provider; disable online voices in the adapter when you want local-only reading. Local logs may contain dialogue and spoilers. Share only relevant, reviewed excerpts when reporting a problem. This repository contains no game assets, saves, personal preferences, or play-session logs.
 
 ## For developers
 
-The reader is C# WinForms using `System.Speech`. Game capture and narration policy are separate: the current KiriKiri/Fata bridge exports structured visible state, and shared code decides when to speak. Textractor is the fallback capture source. A second engine adapter has not yet been demonstrated.
+The reader is C# WinForms using native Windows SAPI automation (`SAPI.SpVoice`). Game capture and narration policy are separate: the current KiriKiri/Fata bridge exports structured visible state, and shared code decides when to speak. Textractor is the fallback capture source. A second engine adapter has not yet been demonstrated.
 
 | Path | Purpose |
 | --- | --- |
@@ -128,6 +141,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\source\build.ps1
 ```
 
 This allows scripts only in the launched PowerShell process. It outputs `source\bin\VisualNovelHelper.exe`. With the helper closed, copy that executable to the repository's `bin` folder to run it with the bundled profiles and tools. The generated bridge is shipped separately; this build step does not regenerate it. Some engine integration fixtures belong to the development workspace and are not included in this portable distribution.
+
+Speech validation: run `bin\VisualNovelHelper.exe --voice-test` to check voice identity migration, discovery, refresh, WAV generation, and cancellation/replacement with each installed SAPI voice. Test text is synthetic, and audio is written to `tests/`; online voices, if enabled, still contact their provider. `--ui-smoke` captures the settings and voice setup windows. `--self-test-portable` runs the shared policy suite and explicitly reports the unavailable native TJS fixture as skipped; the original `--self-test` remains strict and requires that fixture. See [WINDOWS_VOICES.md](WINDOWS_VOICES.md) for the analysis and validation record.
 
 
 To build the EXE installer, use [Inno Setup 6.7.3](https://jrsoftware.org/isdl.php) and run:

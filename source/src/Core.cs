@@ -10,6 +10,7 @@ public sealed class GameProfile {
 }
 public sealed class Preferences {
     public string Voice = "";
+    public string VoiceId = ""; // Stable SAPI token ID; Voice keeps legacy name compatibility.
     public int Rate = 0;
     public int Volume = 85;
     public bool ReadControls = true;

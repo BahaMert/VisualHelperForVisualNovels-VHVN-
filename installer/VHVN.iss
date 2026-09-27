@@ -58,6 +58,7 @@ Source: "..\VERSION.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\START HERE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD PARTY.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\WINDOWS_VOICES.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\VHVN"; Filename: "{app}\bin\VisualNovelHelper.exe"; WorkingDir: "{app}"

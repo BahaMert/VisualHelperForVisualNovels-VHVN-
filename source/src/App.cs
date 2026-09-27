@@ -4,16 +4,9 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Speech.Synthesis;
 using System.Web.Script.Serialization;
 
 namespace VisualNovelHelper {
-public sealed class WindowsSpeech : ISpeechOutput {
-    public readonly SpeechSynthesizer Engine=new SpeechSynthesizer();
-    public void Speak(string text) { Engine.SpeakAsync(text); }
-    public void Stop() { Engine.SpeakAsyncCancelAll(); }
-    public void Dispose() { Stop(); Engine.Dispose(); }
-}
 public sealed class HelperWindow : Form {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
@@ -27,6 +20,8 @@ public sealed class HelperWindow : Form {
     readonly Label status=new Label();
     readonly Label current=new Label();
     readonly ComboBox voices=new ComboBox();
+    readonly Label voiceStatus=new Label();
+    bool loadingVoices, preserveMissingVoice;
     readonly NumericUpDown rate=new NumericUpDown(), volume=new NumericUpDown();
     readonly Button toggle=new Button();
     readonly Button repeatBinding=new Button(), toggleBinding=new Button(), skipBinding=new Button();
@@ -55,18 +50,14 @@ public sealed class HelperWindow : Form {
         try { preferences=File.Exists(prefPath)?json.Deserialize<Preferences>(File.ReadAllText(prefPath)):new Preferences(); }
         catch { preferences=new Preferences(); }
         narrator=new NarrationController(speech);
-        Text="VHVN — Visual Helper for Visual Novels"; Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath); ClientSize=new Size(640,675); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
+        Text="VHVN — Visual Helper for Visual Novels"; Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath); ClientSize=new Size(640,775); AutoScroll=true; AutoScaleDimensions=new SizeF(96,96); AutoScaleMode=AutoScaleMode.Dpi;
         Font=new Font("Segoe UI",12); StartPosition=FormStartPosition.CenterScreen;
         var heading=new Label { Text="Fata Morgana read-aloud", Font=new Font(Font.FontFamily,16,FontStyle.Bold), AutoSize=true, Location=new Point(20,16) };
         Controls.Add(heading);
         status.SetBounds(20,55,600,65); status.Text="Open the game, then connect."; status.AccessibleName="Connection status"; Controls.Add(status);
         Controls.Add(new Label { Text="Voice", Location=new Point(20,129), AutoSize=true });
         voices.SetBounds(100,124,510,30); voices.DropDownStyle=ComboBoxStyle.DropDownList; voices.AccessibleName="Reading voice";
-        foreach(var voice in speech.Engine.GetInstalledVoices()) if(voice.Enabled) voices.Items.Add(voice.VoiceInfo.Name);
-        if(voices.Items.Count==0) throw new InvalidOperationException("No Windows speech voices are installed.");
-        voices.SelectedItem=preferences.Voice;
-        if(voices.SelectedIndex<0) voices.SelectedItem=speech.Engine.Voice.Name;
-        if(voices.SelectedIndex<0) voices.SelectedIndex=0;
+        LoadVoices();
         Controls.Add(voices);
         Controls.Add(new Label { Text="Speed", Location=new Point(20,174), AutoSize=true });
         rate.SetBounds(100,168,85,30); rate.Minimum=-10; rate.Maximum=10; rate.Value=Math.Max(-10,Math.Min(10,preferences.Rate)); rate.AccessibleName="Reading speed"; Controls.Add(rate);
@@ -88,26 +79,40 @@ public sealed class HelperWindow : Form {
         opening.CheckedChanged+=delegate {preferences.ReadOpening=opening.Checked; SaveSettings();}; Controls.Add(opening);
         var readControls=new CheckBox {Text="Read helper controls aloud",AccessibleName="Read helper controls aloud",Checked=preferences.ReadControls,Location=new Point(20,591),Size=new Size(590,40)};
         readControls.CheckedChanged+=delegate { preferences.ReadControls=readControls.Checked; SaveSettings(); if(preferences.ReadControls) SpeakControl("Helper control reading on."); }; Controls.Add(readControls);
+        AddButton("Natural voices / setup",20,640,290,delegate {
+            using(var dialog=new VoiceSetupDialog(preferences.ReadControls?(Action<string>)SpeakControl:null)) dialog.ShowDialog(this);
+        });
+        AddButton("Refresh voices",320,640,290,delegate {
+            try { speech.Refresh(); LoadVoices(); SaveSettings(); }
+            catch(Exception ex) { VoiceFailed(ex.Message); }
+        });
+        voiceStatus.SetBounds(20,686,600,80); voiceStatus.AccessibleName="Voice status"; Controls.Add(voiceStatus);
+        speech.Failed+=VoiceFailed;
+        speech.Diagnostic+=kind=>log.Write(kind,new { voiceId=speech.SelectedId });
         tray.Icon=Icon; tray.Text="VHVN"; tray.Visible=true;
         var menu=new ContextMenuStrip(); menu.Items.Add("Settings",null,delegate { Show(); WindowState=FormWindowState.Normal; Activate(); }); menu.Items.Add("Exit",null,delegate { Close(); }); tray.ContextMenuStrip=menu;
         tray.DoubleClick+=delegate { Show(); WindowState=FormWindowState.Normal; Activate(); };
         Resize+=delegate { if(WindowState==FormWindowState.Minimized) Hide(); };
-        voices.SelectedIndexChanged+=delegate { SaveSettings(); }; rate.ValueChanged+=delegate { SaveSettings(); }; volume.ValueChanged+=delegate { SaveSettings(); };
+        voices.SelectedIndexChanged+=delegate { if(!loadingVoices) { preserveMissingVoice=false; voiceStatus.Text=""; SaveSettings(); } }; rate.ValueChanged+=delegate { SaveSettings(); }; volume.ValueChanged+=delegate { SaveSettings(); };
         initialized=true; SaveSettings();
         UiAccessibility.Wire(this,()=>preferences.ReadControls && !uiSmoke,SpeakControl);
         status.TextChanged+=delegate { status.AccessibleDescription=status.Text; if(!uiSmoke && preferences.ReadControls && ContainsFocus) SpeakControl(status.Text); };
         timer.Interval=20; timer.Tick+=delegate { Tick(); }; timer.Start();
-        speech.Engine.SpeakStarted+=(s,e)=>log.Write("speech-started",new { promptId=e.Prompt.GetHashCode() });
-        speech.Engine.SpeakCompleted+=(s,e)=>log.Write("speech-completed",new { cancelled=e.Cancelled, error=e.Error==null?null:e.Error.Message });
         Shown+=delegate {
             log.Write("window-shown",new { smokeTest=uiSmoke });
             if(uiSmoke) {
                 Application.DoEvents();
                 if(voices.SelectedItem==null) throw new Exception("Voice selector has no accessible selection");
+                if(String.IsNullOrWhiteSpace(voices.Text)) throw new Exception("Selected voice has no visible label");
                 Directory.CreateDirectory(Path.Combine(root,"tests"));
                 using(var bitmap=new Bitmap(Width,Height)) { DrawToBitmap(bitmap,new Rectangle(0,0,Width,Height)); bitmap.Save(Path.Combine(root,"tests","helper-ui.png")); }
                 ShortcutDialog.Smoke(Path.Combine(root,"tests","shortcut-ui.png"));
                 PortableSetup.ConfirmationSmoke(Path.Combine(root,"tests","replacement-ui.png"));
+                using(var dialog=new VoiceSetupDialog(null)) {
+                    dialog.Show(); Application.DoEvents();
+                    using(var bitmap=new Bitmap(dialog.Width,dialog.Height)) { dialog.DrawToBitmap(bitmap,new Rectangle(0,0,dialog.Width,dialog.Height)); bitmap.Save(Path.Combine(root,"tests","voice-setup-ui.png")); }
+                    dialog.Close();
+                }
                 var closer=new System.Windows.Forms.Timer { Interval=1500 };
                 closer.Tick+=delegate { closer.Stop(); closer.Dispose(); Close(); };
                 closer.Start(); return;
@@ -145,11 +150,33 @@ public sealed class HelperWindow : Form {
         }
     }
     void SaveSettings() {
-        if(!initialized) return;
-        preferences.Voice=(string)voices.SelectedItem; preferences.Rate=(int)rate.Value; preferences.Volume=(int)volume.Value;
-        speech.Stop(); speech.Engine.SelectVoice(preferences.Voice); speech.Engine.Rate=preferences.Rate; speech.Engine.Volume=preferences.Volume;
+        if(!initialized || loadingVoices) return;
+        var selected=voices.SelectedItem as SpeechVoice;
+        string previous=speech.SelectedId;
+        try { speech.Configure(selected,(int)rate.Value,(int)volume.Value); }
+        catch(Exception ex) {
+            loadingVoices=true;
+            try { voices.SelectedItem=WindowsSpeech.Resolve(speech.Voices,previous,null); }
+            finally { loadingVoices=false; }
+            VoiceFailed(ex.Message); return;
+        }
+        if(!preserveMissingVoice) { preferences.Voice=selected.Name; preferences.VoiceId=selected.Id; }
+        preferences.Rate=(int)rate.Value; preferences.Volume=(int)volume.Value;
         File.WriteAllText(Path.Combine(dataRoot,"preferences.json"),json.Serialize(preferences));
     }
+    void LoadVoices() {
+        loadingVoices=true;
+        try {
+            voices.Items.Clear(); foreach(var voice in speech.Voices) voices.Items.Add(voice);
+            var saved=WindowsSpeech.Resolve(speech.Voices,preferences.VoiceId,preferences.Voice);
+            preserveMissingVoice=saved==null && (!String.IsNullOrEmpty(preferences.VoiceId) || !String.IsNullOrEmpty(preferences.Voice));
+            voices.SelectedItem=saved ?? speech.DefaultVoice;
+            bool hasNatural=false;
+            foreach(var voice in speech.Voices) if(voice.Description.IndexOf("(Natural)",StringComparison.OrdinalIgnoreCase)>=0) hasNatural=true;
+            voiceStatus.Text=preserveMissingVoice?"Saved voice unavailable. Using "+voices.SelectedItem+" for now. Refresh after installing the voice, or select a replacement.":speech.Voices.Count+" Windows voices available. "+(hasNatural?"Natural voices are available in the voice list.":"Natural voices may need additional setup.");
+        } finally { loadingVoices=false; }
+    }
+    void VoiceFailed(string message) { voiceStatus.Text=message; voiceStatus.AccessibleDescription=message; log.Write("speech-error",message); }
     void Toggle() { narrator.Toggle(); toggle.Text=narrator.Enabled?"Speech: on":"Speech: off"; toggle.AccessibleName=toggle.Text; log.Write("speech-enabled",narrator.Enabled); }
     bool GameFocused() { uint pid; GetWindowThreadProcessId(GetForegroundWindow(),out pid); return adapter!=null && pid==adapter.GamePid; }
     void ReleaseGameInput() { try { gameInput.Publish(viewReader==null?null:viewReader.Session,false,0,false,DateTime.UtcNow); } catch(Exception ex) {log.Write("input-release-error",ex.Message);} }
@@ -177,6 +204,7 @@ public sealed class HelperWindow : Form {
     void Fail(Exception ex) { ReleaseGameInput(); status.Text=ex.Message; log.Write("error",ex.ToString()); narrator.Stop(); if(shortcuts!=null) shortcuts.GamePid=0; if(adapter!=null) { adapter.Dispose(); adapter=null; } Show(); WindowState=FormWindowState.Normal; }
     void Tick() {
         try {
+            speech.Poll();
             if(waitingForGame && DateTime.UtcNow>=nextGameCheck) {
                 nextGameCheck=DateTime.UtcNow.AddSeconds(1);
                 if(System.Diagnostics.Process.GetProcessesByName(profile.processName).Length>0) Connect();
@@ -225,9 +253,12 @@ public static class Program {
             catch(Exception ex) { trace(ex.ToString()); return 1; }
         }
         if(args.Length>0 && args[0]=="--self-test") return SelfTests.Run(root,args.Length>1?args[1]:null);
+        if(args.Length>0 && args[0]=="--self-test-portable") return SelfTests.Run(root,null,true);
+        if(args.Length>0 && args[0]=="--voice-test") return VoiceTests.Run(root);
         if(args.Length>0 && args[0]=="--speech-smoke") {
             trace("Creating speech engine");
-            using(var output=new WindowsSpeech()) { trace("Engine created"); output.Engine.SetOutputToWaveFile(Path.Combine(root,"tests","speech-smoke.wav")); output.Engine.Speak("Visual Novel Helper speech test."); trace("WAV generated"); } trace("Speech engine disposed"); return 0;
+            Directory.CreateDirectory(Path.Combine(root,"tests"));
+            using(var output=new WindowsSpeech()) { trace("Engine created"); output.WriteWave(Path.Combine(root,"tests","speech-smoke.wav"),"Visual Novel Helper speech test."); trace("WAV generated"); } trace("Speech engine disposed"); return 0;
         }
         bool created;
         using(var mutex=new Mutex(true,"Local\\VisualNovelHelper",out created)) {
