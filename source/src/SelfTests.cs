@@ -11,13 +11,19 @@ public static class SelfTests {
         public void Dispose() { }
     }
     static void Check(bool ok,string name) { if(!ok) throw new Exception("FAIL: "+name); }
-    public static int Run(string root,string fixture) {
+    public static int Run(string root,string fixture,bool allowMissingNativeFixture=false) {
         var result=new List<string>();
+        Directory.CreateDirectory(Path.Combine(root,"tests"));
         try {
-            ViewSelfTests.Run(root);
+            VoiceTests.SelectionTests();
+            result.Add("PASS: voice identity, preference migration and missing-voice recovery");
+            ViewSelfTests.Run(root,allowMissingNativeFixture);
+            if(allowMissingNativeFixture && !File.Exists(Path.Combine(root,"work","engine-probe","bridge-test.txt")))
+                result.Add("SKIP: native TJS checksum interop fixture is not distributed with this repository");
+            else result.Add("PASS: native TJS checksum interop fixture");
             OpeningTests.Run();
             result.Add("PASS: opening OCR latest-scene selection, deduplication, focus-loss cancellation and disabled setting");
-            result.Add("PASS: structured transport, TJS checksum, malformed/stale state rejection, source priority, hover dwell, view transitions and focus");
+            result.Add("PASS: structured transport, malformed/stale state rejection, source priority, hover dwell, view transitions and focus");
             var json=new JavaScriptSerializer();
             var profile=json.Deserialize<GameProfile>(File.ReadAllText(Path.Combine(root,"profiles","fata.json")));
             var prefs=json.Deserialize<Preferences>("{\"Voice\":\"\",\"Rate\":0,\"Volume\":85}");

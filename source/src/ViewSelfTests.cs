@@ -7,7 +7,7 @@ public static class ViewSelfTests {
     static string Frame(string body,int seq=1) {
         return "VNH2\t123-456\t"+seq+"\n"+body+"\nEND\t123-456\t"+seq+"\t"+body.Length+"\t"+ViewProtocol.Checksum(body)+"\n";
     }
-    public static void Run(string root) {
+    public static void Run(string root,bool allowMissingNativeFixture=false) {
         string body="mode\tlinks\nitem\tc:0:0\tHello%25%09world\nitem\tc:0:1\t............\nfocus\t";
         string frame=Frame(body);
         var view=ViewProtocol.Parse(frame);
@@ -18,7 +18,8 @@ public static class ViewSelfTests {
         Check(ViewProtocol.Parse(Frame(body+"unknown\tvalue"))==null,"unknown records rejected");
         Check(ViewProtocol.Parse(Frame(body+"c:9:9"))==null,"focus must exist");
         var fixture=Path.Combine(root,"work","engine-probe","bridge-test.txt");
-        Check(File.Exists(fixture) && ViewProtocol.Parse(File.ReadAllText(fixture))!=null,"actual TJS checksum compatibility");
+        if(!allowMissingNativeFixture || File.Exists(fixture))
+            Check(File.Exists(fixture) && ViewProtocol.Parse(File.ReadAllText(fixture))!=null,"actual TJS checksum compatibility");
         var now=new DateTime(2026,9,19,0,0,0,DateTimeKind.Utc);
         var p=new ViewNarration();
         Check(p.Update(view,true,now).Text==null && p.OwnsNarration,"initial dwell and source priority");
